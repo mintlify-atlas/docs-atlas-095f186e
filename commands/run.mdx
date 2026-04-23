@@ -1,0 +1,95 @@
+---
+title: 'aube run — run a script from package.json'
+description: 'Execute any script defined in package.json, with support for workspace-wide parallel execution, auto-install, and the aubr shim for faster invocation.'
+keywords: ['aube run', 'run script', 'package.json scripts', 'workspace scripts', 'aubr']
+sidebarTitle: 'run'
+---
+
+`aube run` executes a script defined in the `scripts` section of `package.json`. Before running the script, aube checks whether `node_modules` is up to date with the current lockfile and `package.json`; if it isn't, aube installs automatically. You can skip this check with `--no-install`.
+
+On an interactive TTY, omitting the script name opens a picker that lists all available scripts in the current package.
+
+## Synopsis
+
+```bash
+aube run [FLAGS] [script] [-- args…]
+```
+
+The `aubr` shim is equivalent to `aube run`:
+
+```bash
+aubr build
+aubr test -- --watch
+```
+
+## Auto-install behaviour
+
+aube computes a BLAKE3 hash over the lockfile, `package.json`, and install-shape settings and stores it in `node_modules/.aube-state`. If the hash matches, the install step is skipped entirely. If it doesn't match, aube runs a full install before executing the script.
+
+Pass `--no-install` to skip this check and run the script immediately regardless of state.
+
+## Flags
+
+<ParamField query="--if-present" type="boolean">
+  Silently exit with code 0 if the named script is not defined in `package.json`, instead of erroring. Useful in scripts that call optional hooks.
+</ParamField>
+
+<ParamField query="--no-install" type="boolean">
+  Skip the auto-install freshness check and run the script immediately.
+</ParamField>
+
+<ParamField query="--parallel" type="boolean">
+  Run the script in every matched workspace package concurrently, with unbounded parallelism. Pair with a filter (`-r` / `--filter`) — single-package runs ignore this flag. The first non-zero exit fails the whole run, but sibling processes are allowed to finish so their output isn't truncated.
+</ParamField>
+
+<ParamField query="-s" type="boolean">
+  Suppress aube's wrapper output while still showing the script's own stdout and stderr. Short alias for the global `--silent` flag.
+</ParamField>
+
+<ParamField query="--workspace-concurrency" type="number">
+  Maximum number of workspace packages to run concurrently during recursive execution. Accepted for pnpm compatibility.
+</ParamField>
+
+## Examples
+
+```bash
+# Run the build script
+aube run build
+
+# Run tests with a flag passed to the script
+aube run test -- --watch
+
+# Run the lint script only if it is defined
+aube run --if-present lint
+
+# Skip the auto-install check
+aube run --no-install start
+
+# Run build in every workspace package in parallel
+aube run --parallel --filter '*' build
+
+# Suppress aube's output, show only the script's output
+aube run -s dev
+
+# Use the aubr shim (equivalent to aube run)
+aubr build
+aubr test -- --reporter=verbose
+```
+
+<Tip>
+  Dropping `run` works for most scripts: `aube build`, `aube test`, and `aube start` all delegate to the matching `package.json` script. Use `aube run` explicitly when you need the extra flags documented here.
+</Tip>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube exec" icon="terminal" href="/commands/exec">
+    Run a binary from node_modules/.bin directly.
+  </Card>
+  <Card title="aube dlx" icon="bolt" href="/commands/dlx">
+    Fetch and run a package in a throwaway environment.
+  </Card>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Install dependencies before running scripts.
+  </Card>
+</CardGroup>

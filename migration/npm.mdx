@@ -1,0 +1,75 @@
+---
+title: 'Migrating to aube from npm — a complete guide'
+description: 'Switch from npm to aube with a command map, lockfile compatibility details, layout and lifecycle script differences, and CI install options.'
+keywords: ['npm migration', 'package-lock.json', 'npm-shrinkwrap.json', 'aube install', 'aube ci', 'isolated node_modules']
+---
+
+aube can install directly from npm lockfiles. You do not need to delete `package-lock.json` or remove `node_modules` before trying aube — run `aube install` in an existing npm project and it reads the lockfile that is already there.
+
+## Command map
+
+| npm | aube | Notes |
+|-----|------|-------|
+| `npm install` | `aube install` | Reads and updates `package-lock.json` or `npm-shrinkwrap.json` in place. |
+| `npm install --production` | `aube install --prod` | Installs only production dependencies, skipping `devDependencies`. |
+| `npm ci` | `aube ci` | Removes `node_modules`, verifies the lockfile is fresh, then installs. |
+| `npm install react` | `aube add react` | Adds a dependency and updates the lockfile. |
+| `npm install -D vitest` | `aube add -D vitest` | Adds a dev dependency. |
+| `npm uninstall react` | `aube remove react` | Removes from the manifest and relinks. |
+| `npm update` | `aube update` | Updates direct dependencies within declared ranges. |
+| `npm run build` | `aube run build` | Runs a `package.json` script; auto-installs if dependencies are stale. |
+| `npm test` | `aube test` | Shortcut for the `test` script; auto-installs first. |
+| `npm exec -- vitest` | `aube exec vitest` | Runs a local binary with `node_modules/.bin` on `PATH`. |
+| `npm list` | `aube list` | Lists installed packages with depth, JSON, and prod/dev options. |
+| `npm pack` | `aube pack` | Creates a publishable tarball. |
+| `npm publish` | `aube publish` | Publishes to the configured registry. |
+
+## How aube reads package-lock.json
+
+Run `aube install` in any project that has a `package-lock.json` or `npm-shrinkwrap.json`:
+
+```bash
+aube install
+```
+
+aube reads whichever of those two files exists and writes updates back to the same file. Your npm-based teammates and CI pipelines can keep using npm — they will see the same resolved versions because the lockfile is shared.
+
+For a production-only install:
+
+```bash
+aube install --prod
+```
+
+For a strict CI install that verifies the lockfile is up to date before installing:
+
+```bash
+aube ci
+```
+
+## Key differences
+
+### Package layout
+
+aube's default `node_modules` layout is isolated, not flat. Packages are linked through `node_modules/.aube/` using symlinks, and only your declared direct dependencies appear at the project top level. Transitive dependencies are not hoisted into the root of `node_modules`, which prevents phantom dependency access.
+
+If you need a flat hoisted tree for compatibility, opt in with the `nodeLinker: hoisted` setting — see [Configuration settings](/configuration/settings).
+
+### Lifecycle script approval
+
+npm runs `preinstall`, `install`, and `postinstall` scripts for every dependency automatically. aube skips them by default. To allow a package's build scripts to run, use:
+
+```bash
+aube approve-builds
+```
+
+`aube approve-builds` prompts you to select packages interactively and records the approved list in `pnpm-workspace.yaml` under `onlyBuiltDependencies`. This follows the pnpm v11 allowlist model and keeps your install protected from arbitrary code execution in transitive packages.
+
+After approving packages, run `aube rebuild` to execute the newly allowlisted build scripts without reinstalling everything.
+
+### Global installs
+
+Global installs go into aube's global package directory instead of npm's shared global `node_modules`. Commands installed globally via `aube add -g` are available on your `PATH` the same way as npm global installs.
+
+<Note>
+You do not need `aube import` for a normal rollout. `aube install` keeps `package-lock.json` as the shared source of truth. Run `aube import` only if your team wants to convert the project to `aube-lock.yaml` and stop using `package-lock.json`.
+</Note>

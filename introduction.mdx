@@ -1,0 +1,50 @@
+---
+title: "Introduction to aube, a fast Node.js package manager"
+description: "aube is a fast, Rust-powered Node.js package manager. It reads pnpm, npm, yarn, and bun lockfiles in place — no migration needed to get started."
+keywords: ["aube", "node.js", "package manager", "rust", "fast", "pnpm", "npm", "yarn", "bun"]
+---
+
+aube is a Node.js package manager written in Rust. It drops into existing projects without requiring you to change your lockfile format — if your project already has `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, or `bun.lock`, aube reads and writes it in place. The name means dawn in French and is pronounced `/ob/`, like "ohb".
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Fast installs" icon="bolt" href="/benchmarks">
+    Warm CI is about 7x faster than pnpm and 3x faster than Bun. A global content-addressable store lets all your projects share package files instead of keeping separate copies.
+  </Card>
+  <Card title="Drop-in compatible" icon="plug" href="/guides/lockfiles">
+    Works with your existing `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, and `bun.lock`. No migration required to try it — aube reads and writes each format in place.
+  </Card>
+  <Card title="Auto-install" icon="arrows-rotate" href="/guides/scripts">
+    `aube run`, `aube test`, and `aube exec` check install freshness automatically. If `package.json` or the lockfile changed, they install first and then run — no separate step needed.
+  </Card>
+  <Card title="Secure defaults" icon="shield-check" href="/guides/lifecycle-scripts">
+    New package releases wait out a minimum age before install. Lifecycle scripts from transitive dependencies are blocked until you explicitly approve them with `aube approve-builds`.
+  </Card>
+</CardGroup>
+
+## Why it's fast
+
+aube is built in Rust and uses a content-addressable global store at `~/.local/share/aube/store/`. When you install the same package in multiple projects, the files are stored once and linked — not copied. On warm CI runs where the store is already populated, installs reach up to ~22x faster than pnpm and ~3x faster than Bun across fixture sets because aube only verifies and links instead of re-downloading.
+
+The frozen fast path in aube's install pipeline short-circuits entirely when the lockfile and `package.json` match the recorded install state. Commands like `aube test` and `aube exec` check this state before running, so you avoid a redundant install on every invocation.
+
+## Project status
+
+<Note>
+  aube is currently in beta. The current release is **v1.0.0-beta.12**. The CLI surface, lockfile format, and configuration are stable for day-to-day use, but some edges may change before v1.0.0. Breaking changes are noted in the release notes.
+</Note>
+
+aube is suitable for real projects today. Many teams are already using it in CI and local development. The beta label reflects that certain advanced features — such as patch management and some workspace edge cases — are still being refined.
+
+<Tip>
+  Because aube reads existing lockfiles, you can try it in a project without committing to it. Run `aube install` once, check the result, and switch back to your previous tool if needed — your lockfile stays in its original format.
+</Tip>
+
+## Support and community
+
+Have a question or want to share feedback? Join the conversation in [GitHub Discussions](https://github.com/endevco/aube/discussions). That is the best place to ask questions, discuss use cases, and keep up with what's coming.
+
+<Warning>
+  GitHub Issues are disabled for this project. Use [GitHub Discussions](https://github.com/endevco/aube/discussions) for support and feature requests.
+</Warning>

@@ -1,0 +1,78 @@
+---
+title: 'aube ci — clean install for reproducible CI builds'
+description: 'Delete node_modules and reinstall from a frozen lockfile — guaranteeing a reproducible environment in CI that exactly matches the committed lockfile.'
+keywords: ['aube ci', 'clean install', 'frozen lockfile', 'CI', 'reproducible build']
+sidebarTitle: 'ci'
+---
+
+`aube ci` provides a reproducible install for continuous integration environments. It removes any existing `node_modules`, then runs `aube install` with `--frozen-lockfile`, which fails if the lockfile is missing or out of date with `package.json`. This guarantees that every CI run installs exactly what the lockfile records — no implicit updates, no drift.
+
+Use `aube ci` in CI pipelines instead of `aube install` to catch lockfile inconsistencies before they reach production.
+
+## Synopsis
+
+```bash
+aube ci [--ignore-scripts] [--no-optional]
+```
+
+Aliases: `aube clean-install`, `aube install-clean`
+
+## How it works
+
+<Steps>
+  <Step title="Remove node_modules">
+    aube deletes the existing `node_modules` directory at the workspace root (and in each workspace package, if applicable).
+  </Step>
+  <Step title="Verify the lockfile">
+    aube checks that `aube-lock.yaml` (or the detected lockfile format) exists and is consistent with `package.json`. If it's missing or out of sync, `ci` fails with an error rather than regenerating the lockfile.
+  </Step>
+  <Step title="Install from the lockfile">
+    aube installs the exact versions recorded in the lockfile — no range re-resolution, no registry queries for newer versions.
+  </Step>
+</Steps>
+
+## Flags
+
+<ParamField query="--no-optional" type="boolean">
+  Skip `optionalDependencies` and don't install optional native modules. Useful when optional packages contain platform-specific binaries that aren't needed in CI.
+</ParamField>
+
+<ParamField query="--ignore-scripts" type="boolean">
+  Skip lifecycle scripts. This flag is accepted for pnpm compatibility; aube already skips dependency lifecycle scripts by default, so it is a no-op unless you have a root `prepare` or `postinstall` script.
+</ParamField>
+
+## Examples
+
+```bash
+# Standard CI install
+aube ci
+
+# Skip optional dependencies
+aube ci --no-optional
+
+# Skip optional deps and root scripts
+aube ci --no-optional --ignore-scripts
+```
+
+```yaml GitHub Actions example
+- name: Install dependencies
+  run: aube ci
+```
+
+<Warning>
+  If `aube ci` fails with a lockfile mismatch error, the fix is to run `aube install` locally, commit the updated `aube-lock.yaml`, and push. Never work around this by switching to `aube install` in CI — the check exists to catch exactly this situation.
+</Warning>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Standard install with lockfile update support.
+  </Card>
+  <Card title="aube add" icon="plus" href="/commands/add">
+    Add a dependency and update the lockfile.
+  </Card>
+  <Card title="aube run" icon="play" href="/commands/run">
+    Run a script defined in package.json.
+  </Card>
+</CardGroup>

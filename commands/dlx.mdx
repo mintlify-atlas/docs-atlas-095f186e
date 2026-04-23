@@ -1,0 +1,82 @@
+---
+title: 'aube dlx — run a package in a throwaway environment'
+description: 'Fetch a package into a scratch environment, run its binary, then discard everything — ideal for one-off tools and scaffolding without modifying package.json.'
+keywords: ['aube dlx', 'npx', 'dlx', 'throwaway environment', 'aube create', 'aubx']
+sidebarTitle: 'dlx'
+---
+
+`aube dlx` fetches a package into a temporary scratch directory, adds `<scratch>/node_modules/.bin` to `PATH`, runs the specified binary, and then discards the environment. Nothing is written to your project's `node_modules` or `package.json`. It is the aube equivalent of `npx` or `pnpm dlx`.
+
+`aube create` is built on `dlx`: `aube create vite` is shorthand for `aube dlx create-vite`.
+
+## Synopsis
+
+```bash
+aube dlx [-p <package>…] [-c] <command> [args…]
+```
+
+The `aubx` shim is equivalent to `aube dlx`:
+
+```bash
+aubx create-next-app my-app
+aubx -p typescript tsc --version
+```
+
+## Flags
+
+<ParamField query="-p / --package" type="string[]">
+  Install a specific package (or packages) into the scratch environment, then run the command. Repeatable. When omitted, aube infers the package to install from the command name.
+</ParamField>
+
+<ParamField query="-c / --shell-mode" type="boolean">
+  Run the assembled command line through `sh -c` with `<scratch>/node_modules/.bin` prepended to `PATH`. Use this for pipelines, redirects, or shell variable expansion.
+</ParamField>
+
+## Inferring the package name
+
+When you don't pass `-p`, aube infers the package to install from the first positional argument. Running `aube dlx cowsay hello` installs the `cowsay` package, then calls the `cowsay` binary with `hello` as its argument.
+
+When the command name differs from the package name (for example, the `create-react-app` binary lives in the `create-react-app` package), pass `-p` explicitly.
+
+## Examples
+
+```bash
+# Run a one-off binary (package name inferred from command)
+aube dlx cowsay 'hello from aube'
+
+# Scaffold a new Vite project
+aube dlx create-vite my-app
+
+# Explicitly specify the package to install
+aube dlx -p typescript tsc --version
+
+# Install multiple packages into the scratch environment
+aube dlx -p eslint -p @eslint/js eslint --init
+
+# Use shell mode for pipelines
+aube dlx -p cowsay -c 'cowsay hello | tr a-z A-Z'
+
+# Use the aube create shorthand (equivalent to dlx create-vite)
+aube create vite my-app
+
+# Use the aubx shim
+aubx create-next-app my-app --ts
+```
+
+<Note>
+  Each `aube dlx` invocation uses a fresh scratch environment. If you need the package available persistently, use `aube add -g` for a global install or `aube add` to add it to your project.
+</Note>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube exec" icon="terminal" href="/commands/exec">
+    Run a binary already installed in node_modules/.bin.
+  </Card>
+  <Card title="aube run" icon="play" href="/commands/run">
+    Run a script defined in package.json.
+  </Card>
+  <Card title="aube add" icon="plus" href="/commands/add">
+    Permanently add a package to your project.
+  </Card>
+</CardGroup>

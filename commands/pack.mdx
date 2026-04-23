@@ -1,0 +1,77 @@
+---
+title: 'Create a publishable tarball with aube pack'
+description: 'Build a .tgz tarball from your package source — preview included files, write to a custom destination, and inspect the result as JSON before publishing.'
+keywords: ['aube pack', 'tarball', 'tgz', 'pack destination', 'dry-run', 'npm pack', 'publish']
+---
+
+`aube pack` creates a publishable `.tgz` tarball from the current package directory without uploading it to the registry. Use it to inspect exactly which files will be included before you run `aube publish`, or to produce a tarball for local distribution and testing.
+
+## Basic usage
+
+```bash
+aube pack
+```
+
+This writes a `<name>-<version>.tgz` file to the current directory.
+
+## File selection
+
+`aube pack` applies npm-style file selection in this order:
+
+1. The `files` field in `package.json`, if present.
+2. Standard ignore rules (`.npmignore`, `.gitignore`) otherwise.
+
+Regardless of which rule applies, `package.json`, `README`, `LICENSE`, and the `main` entry point are always included.
+
+## Flags
+
+### `--dry-run`
+
+Print the list of files that would be packed without writing the tarball. Use this to verify file selection before publishing.
+
+```bash
+aube pack --dry-run
+```
+
+### `--json`
+
+Print the result as a JSON object describing the tarball: filename, size, and the list of packed files. The output format matches `aube publish --json`.
+
+```bash
+aube pack --json
+```
+
+Combine with `--dry-run` to get a machine-readable preview without writing anything to disk:
+
+```bash
+aube pack --dry-run --json
+```
+
+### `--pack-destination <DIR>`
+
+Write the tarball to a specific directory instead of the current working directory.
+
+```bash
+aube pack --pack-destination dist
+aube pack --pack-destination /tmp/releases
+```
+
+## Inspecting before publishing
+
+A typical pre-publish workflow:
+
+```bash
+# Preview files that will be included
+aube pack --dry-run
+
+# Write and inspect the actual tarball
+aube pack
+tar -tzf my-package-1.0.0.tgz
+```
+
+You can also install the local tarball into another project to test it before publishing:
+
+```bash
+aube pack --pack-destination /tmp
+aube add /tmp/my-package-1.0.0.tgz
+```

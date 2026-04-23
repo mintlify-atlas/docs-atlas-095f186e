@@ -1,0 +1,67 @@
+---
+title: 'aube remove — remove a dependency from your project'
+description: 'Remove one or more packages from package.json, update the lockfile, and relink node_modules — with support for global and workspace-root removals.'
+keywords: ['aube remove', 'uninstall package', 'remove dependency', 'aube rm']
+sidebarTitle: 'remove'
+---
+
+`aube remove` deletes the named packages from `package.json`, updates `aube-lock.yaml`, and relinks `node_modules` in one step. It is the inverse of `aube add`. After removal, any packages that are no longer needed are pruned from the virtual store automatically.
+
+## Synopsis
+
+```bash
+aube remove [FLAGS] <package>…
+```
+
+Alias: `aube rm`
+
+## Flags
+
+<ParamField query="-D / --save-dev" type="boolean">
+  Remove the package only from `devDependencies`. Use this when the same package name appears under multiple dependency sections and you want to target dev specifically.
+</ParamField>
+
+<ParamField query="-g / --global" type="boolean">
+  Remove the package from the global install directory instead of the current project.
+</ParamField>
+
+<ParamField query="--ignore-scripts" type="boolean">
+  Skip root lifecycle scripts during the chained reinstall that follows the removal.
+</ParamField>
+
+<ParamField query="-w / --workspace" type="boolean">
+  Remove the dependency from the workspace root's `package.json` regardless of the current working directory. aube walks up from the cwd to find `aube-workspace.yaml`, `pnpm-workspace.yaml`, or a `package.json` with a `workspaces` field. Takes precedence over `--filter` when both are supplied.
+</ParamField>
+
+## Examples
+
+```bash
+# Remove a dependency
+aube remove lodash
+
+# Remove multiple packages at once
+aube remove chalk ora
+
+# Remove a package only from devDependencies
+aube remove -D eslint
+
+# Remove a globally installed package
+aube remove -g cowsay
+
+# Remove from the workspace root regardless of cwd
+aube remove -w prettier
+```
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube add" icon="plus" href="/commands/add">
+    Add a new dependency to the project.
+  </Card>
+  <Card title="aube update" icon="arrow-up" href="/commands/update">
+    Update installed packages to newer versions.
+  </Card>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Re-install all dependencies from package.json.
+  </Card>
+</CardGroup>

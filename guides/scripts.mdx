@@ -1,0 +1,96 @@
+---
+title: 'Running package.json scripts and binaries with aube'
+description: 'Run package.json scripts, local binaries, and one-off tools with aube run, exec, and dlx — with automatic install-state checks built in.'
+keywords: ['aube run', 'aube exec', 'aube dlx', 'aube test', 'aube start', 'aubr', 'aubx', 'scripts']
+---
+
+aube follows npm and pnpm script conventions and adds one useful behaviour on top: before running a script or local binary, aube checks whether `node_modules` is up to date. If the lockfile or `package.json` changed since the last install, aube installs first and then runs — so you never have to remember to reinstall before running your tests.
+
+## Running package.json scripts
+
+```bash
+aube run build
+aube test
+aube start
+aube stop
+aube restart
+```
+
+Shortcuts like `aube test` and `aube start` are aliases for the corresponding `run` subcommand. You can also invoke any script by name directly — if `dev` or `lint` is in `package.json`, aube treats `aube dev` and `aube lint` as `aube run dev` and `aube run lint`.
+
+<Tip>
+aube reads `node_modules/.aube-state` before every script execution. This file stores a BLAKE3 hash of the lockfile, `package.json`, and the resolved install shape. If anything changed since the last install, aube runs a fresh install automatically — then proceeds with the script. Pass `--no-install` to skip that check when you know the install is current.
+</Tip>
+
+```bash
+aube run --no-install build
+aube test --no-install
+```
+
+Use `--if-present` to silently skip scripts that are not defined in `package.json`:
+
+```bash
+aube run --if-present lint
+```
+
+## Running local binaries
+
+`aube exec` runs a binary from `node_modules/.bin` with the full project context on `PATH`:
+
+```bash
+aube exec vitest
+aube exec tsc -- --noEmit
+```
+
+Like `aube run`, `exec` checks install freshness before running. Pass `--no-install` to opt out.
+
+## Running one-off tools with dlx
+
+`aube dlx` fetches a package into a throwaway environment and runs its binary — nothing is written to the project:
+
+```bash
+aube dlx cowsay hi
+aube dlx -p create-vite create-vite my-app
+```
+
+The `-p` flag lets you specify the package to install when its name differs from the binary you want to run.
+
+## Shortcuts: aubr and aubx
+
+`aubr` and `aubx` are multicall shims that ship alongside `aube`. They dispatch on `argv[0]` — every flag that works on the full command works on the shim.
+
+<CodeGroup>
+
+```bash aubr (aube run)
+aubr build            # aube run build
+aubr -r test          # aube -r run test
+```
+
+```bash aubx (aube dlx)
+aubx cowsay hi        # aube dlx cowsay hi
+aubx -p create-vite create-vite my-app
+```
+
+</CodeGroup>
+
+If you install aube by hand — for example by copying the binary out of a tarball — bring `aubr` and `aubx` along so the shortcuts resolve on `PATH`.
+
+## Running scripts across a workspace
+
+Use `-r` to run a script in every workspace package, or `-F` to filter to a subset:
+
+```bash
+# All packages
+aube -r run build
+
+# Packages matching a glob
+aube -F '@scope/*' run test
+
+# A specific package path
+aube -F './packages/api' exec tsc -- --noEmit
+
+# api and everything that depends on it
+aube -F 'api...' run build
+```
+
+`-r` is shorthand for `--filter=*`. Filters support exact names, globs, paths, dependency-graph selectors, git-ref selectors, and exclusions. See [Workspaces](/guides/workspaces) for the full filter reference.

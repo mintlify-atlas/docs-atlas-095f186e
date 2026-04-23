@@ -1,0 +1,79 @@
+---
+title: 'Migrating to aube from Yarn — a complete guide'
+description: 'Switch from Yarn classic or Yarn Berry to aube with a command map, yarn.lock compatibility details, PnP limitations, and aube import instructions.'
+keywords: ['yarn migration', 'yarn.lock', 'yarn classic', 'yarn berry', 'yarn PnP', 'aube import', 'node-modules linker']
+---
+
+aube can install directly from both Yarn classic (v1) and Yarn Berry (v2+) lockfiles. You do not need to delete `yarn.lock` or remove `node_modules` before trying aube — run `aube install` in an existing Yarn project and it reads the lockfile that is already there.
+
+## Command map
+
+| Yarn | aube | Notes |
+|------|------|-------|
+| `yarn install` | `aube install` | Reads and updates `yarn.lock` in place (both v1 and v2+ formats). |
+| `yarn add react` | `aube add react` | Adds a dependency and updates the lockfile. |
+| `yarn add -D vitest` | `aube add -D vitest` | Adds a dev dependency. |
+| `yarn remove react` | `aube remove react` | Removes from the manifest and relinks. |
+| `yarn upgrade` | `aube update` | Updates direct dependencies within declared ranges. |
+| `yarn run build` | `aube run build` | Runs a `package.json` script; auto-installs if dependencies are stale. |
+| `yarn test` | `aube test` | Shortcut for the `test` script; auto-installs first. |
+| `yarn dlx cowsay hi` | `aube dlx cowsay hi` | Runs a package in a throwaway environment. |
+| `yarn workspaces list` | `aube list` | Lists packages with workspace support. |
+| `yarn pack` | `aube pack` | Creates a publishable tarball. |
+| `yarn npm publish` | `aube publish` | Publishes to the configured registry. |
+
+## Yarn classic (v1)
+
+Run `aube install` in any project that has a Yarn v1 `yarn.lock`:
+
+```bash
+aube install
+```
+
+aube reads and updates the Yarn v1 `yarn.lock` in place and installs packages into `node_modules/.aube/`. Commit the updated `yarn.lock` so Yarn classic users and aube users see the same resolved versions.
+
+## Yarn Berry (v2+)
+
+aube also reads Berry's YAML-format `yarn.lock` — the one with the `__metadata:` header, `resolution:` and `checksum:` fields, and per-block `linkType`. It writes the same format back, preserving Berry's `checksum:` values verbatim so `yarn install` against the rewritten file still validates cached tarballs.
+
+```bash
+aube install
+```
+
+Supported protocols: `npm:` (the common case), `workspace:`, `file:`, `link:`, plus `git:` / `git+ssh:` / `git+https:` / `https:` URLs for remote sources.
+
+<Note>
+Entries that use `patch:`, `portal:`, or `exec:` protocols are skipped with a warning. aube's dependency graph does not model those yet, and they round-trip better through Yarn itself.
+</Note>
+
+## Yarn PnP
+
+aube does not support Yarn's Plug'n'Play linker. Berry projects using `nodeLinker: pnp` (the default for new Berry projects) need to switch to `nodeLinker: node-modules` before using aube:
+
+```yaml
+# .yarnrc.yml
+nodeLinker: node-modules
+```
+
+Once the project writes a regular `node_modules` tree, run `yarn install` to regenerate `yarn.lock` in node-modules mode, then switch to `aube install`.
+
+## Key differences
+
+- **Global store.** aube keeps package files in a global content-addressable store at `$XDG_DATA_HOME/aube/store/` (defaults to `~/.local/share/aube/store/`), so projects with shared dependencies use less disk space.
+- **Isolated layout.** aube uses isolated symlinks instead of a hoisted flat tree by default. Only declared direct dependencies appear at the project top level.
+- **Workspace discovery.** Workspace package discovery follows `aube-workspace.yaml` (or `pnpm-workspace.yaml` when the project already has one).
+- **Lifecycle scripts.** Yarn runs `preinstall`, `install`, and `postinstall` scripts for every dependency. aube skips them by default and requires explicit approval via `pnpm.allowBuilds`, `pnpm.onlyBuiltDependencies`, or `aube approve-builds`. This follows the pnpm v11 model.
+
+## Converting to aube-lock.yaml
+
+To convert a project from `yarn.lock` to aube's native lockfile format:
+
+```bash
+aube import
+```
+
+`aube import` reads `yarn.lock`, converts its resolved graph to `aube-lock.yaml`, and writes the new file without touching `node_modules`. Run `aube install` afterwards to relink the install. Once the import succeeds, remove `yarn.lock` so future installs write to `aube-lock.yaml`.
+
+<Note>
+For most teams, the simpler rollout is to leave `yarn.lock` in place and let aube read and write it. `aube import` is only necessary when you want to stop using `yarn.lock` entirely.
+</Note>

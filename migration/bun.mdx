@@ -1,0 +1,83 @@
+---
+title: 'Migrating to aube from Bun — a complete guide'
+description: 'Switch from Bun to aube with a command map, bun.lock compatibility details, layout and lifecycle script differences, and runtime management notes.'
+keywords: ['bun migration', 'bun.lock', 'bun.lockb', 'aube install', 'bun install', 'trustedDependencies', 'mise']
+---
+
+aube can install directly from Bun lockfiles. You do not need to delete `bun.lock` or remove `node_modules` before trying aube — run `aube install` in an existing Bun project and it reads the lockfile that is already there.
+
+## Command map
+
+| Bun | aube | Notes |
+|-----|------|-------|
+| `bun install` | `aube install` | Reads and updates `bun.lock` in place. |
+| `bun add react` | `aube add react` | Adds a dependency and updates the lockfile. |
+| `bun add -d vitest` | `aube add -D vitest` | Adds a dev dependency. |
+| `bun remove react` | `aube remove react` | Removes from the manifest and relinks. |
+| `bun update` | `aube update` | Updates direct dependencies within declared ranges. |
+| `bun run build` | `aube run build` | Runs a `package.json` script; auto-installs if dependencies are stale. |
+| `bun test` | `aube test` | Shortcut for the `test` script; auto-installs first. |
+| `bun x cowsay hi` | `aube dlx cowsay hi` | Runs a package in a throwaway environment. |
+| `bun pm ls` | `aube list` | Lists installed packages. |
+| `bun pack` | `aube pack` | Creates a publishable tarball. |
+| `bun publish` | `aube publish` | Publishes to the configured registry. |
+
+## bun.lock support
+
+aube reads and updates the text-format `bun.lock` at `lockfileVersion: 1` in place:
+
+```bash
+aube install
+```
+
+Commit the updated `bun.lock` so both Bun and aube users see the same resolved versions.
+
+### Upgrading from bun.lockb
+
+aube does not read Bun's older binary `bun.lockb` format. Projects still on `bun.lockb` must generate the text lockfile with a modern Bun first:
+
+```bash
+bun install --save-text-lockfile
+```
+
+Commit the resulting `bun.lock` and remove `bun.lockb` before switching to aube.
+
+## Key differences
+
+### Package layout
+
+aube produces an isolated symlink layout under `node_modules/.aube/` rather than Bun's hoisted flat tree. Only declared direct dependencies appear at the project top level. Package files are stored once in a global content-addressable store at `$XDG_DATA_HOME/aube/store/` (defaults to `~/.local/share/aube/store/`), so projects that share dependencies use less disk space.
+
+### Lifecycle script approval
+
+aube gates dependency lifecycle scripts behind an allowlist. It reads Bun's top-level `trustedDependencies` array in addition to pnpm's `pnpm.allowBuilds` / `pnpm.onlyBuiltDependencies`, so an existing Bun manifest keeps running its install scripts without any edits.
+
+```json
+{
+  "trustedDependencies": ["esbuild", "sharp"]
+}
+```
+
+`aube approve-builds` writes new entries into `pnpm-workspace.yaml`'s `onlyBuiltDependencies`. A package listed in `pnpm.neverBuiltDependencies` is denied even if it appears in `trustedDependencies`.
+
+### Runtime management
+
+aube does not manage a JavaScript runtime. Bun acts as both a runtime and a package manager; aube covers only the package manager role. If you need a Node.js version alongside or in place of Bun, use [mise](https://mise.jdx.dev):
+
+```bash
+mise use node@22
+```
+
+## Converting to aube-lock.yaml
+
+To convert a project from `bun.lock` to aube's native lockfile format:
+
+```bash
+aube import
+```
+
+`aube import` reads `bun.lock`, converts its resolved graph to `aube-lock.yaml`, and writes the new file without touching `node_modules`. Run `aube install` afterwards to relink the install. Once the import succeeds, remove `bun.lock` so future installs write to `aube-lock.yaml`.
+
+<Note>
+For most teams, the simpler rollout is to leave `bun.lock` in place and let aube read and write it. `aube import` is only necessary when you want to stop using `bun.lock` entirely.
+</Note>

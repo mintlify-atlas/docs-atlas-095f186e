@@ -1,0 +1,119 @@
+---
+title: "aube store: manage the global content-addressable store"
+description: "Inspect, populate, prune, and check the global BLAKE3 content-addressable store that aube uses to share package files across every project on your machine."
+keywords: ["aube", "store", "content-addressable", "BLAKE3", "global store", "prune", "reflink", "hardlink"]
+---
+
+The global store is the single location on disk where aube keeps every package file it has ever downloaded. All your projects draw from the same pool of files — a given file is stored exactly once regardless of how many projects depend on it. When aube installs a package into `node_modules`, it links from the store using a reflink (APFS, btrfs), a hardlink (ext4), or a copy as a last resort, depending on what your filesystem supports.
+
+The store lives at:
+
+```text
+$XDG_DATA_HOME/aube/store/v1/files/
+```
+
+When `$XDG_DATA_HOME` is not set this defaults to `~/.local/share/aube/store/v1/files/`. Files are named by their BLAKE3 hash and sharded into 256 subdirectories using the first two hex characters of that hash.
+
+## Subcommands
+
+### `aube store path`
+
+Print the absolute path to the store root.
+
+```bash
+aube store path
+```
+
+Use this to script around the store — for example, to measure its size on disk:
+
+```bash
+du -sh "$(aube store path)"
+```
+
+### `aube store prune`
+
+Remove every file from the store that is not referenced by any cached package index.
+
+```bash
+aube store prune
+```
+
+After removing projects, uninstalling packages, or doing a lot of experimental installs, the store can accumulate files that nothing links to anymore. `aube store prune` reclaims that space safely: it only deletes files that no known package index points to.
+
+<Note>
+  Prune reads all cached package indexes to determine what is still referenced. Run it after `aube cache delete` to get a complete picture of what can be removed.
+</Note>
+
+### `aube store status`
+
+Verify the integrity of every file in the store by recomputing its BLAKE3 hash and comparing it against the stored value.
+
+```bash
+aube store status
+```
+
+The command exits with a non-zero status code when it detects any corruption, making it suitable for scripted health checks. A clean store prints a summary and exits `0`.
+
+<Tip>
+  Run `aube store status` after restoring a backup or migrating the store to a new disk to confirm that all files are intact.
+</Tip>
+
+### `aube store add`
+
+Download one or more packages into the store without linking them into any project.
+
+```bash
+aube store add <package-spec>…
+```
+
+Each argument is a package spec in the same form accepted by `aube add`:
+
+| Spec | Description |
+| ---- | ----------- |
+| `lodash` | Latest version |
+| `lodash@4.17.21` | Exact version |
+| `react@next` | Dist-tag |
+| `express@^4` | Semver range |
+
+**Example — pre-warm the store for a production image build:**
+
+```bash
+aube store add react@18 react-dom@18 typescript@5
+```
+
+The packages are fetched and imported into the CAS but no `node_modules` or lockfile is written.
+
+## How multiple projects share files
+
+Every project that has `react@18.2.0` installed draws its files from the same location in the store. When aube installs the package, it creates hardlinks (or reflinks on supported filesystems) from the store into each project's `node_modules/.aube/` virtual store. Disk usage for identical files stays flat no matter how many projects you have.
+
+```text
+~/.local/share/aube/store/v1/files/
+  ab/
+    ab3f1c…   ← react/index.js, shared by every project
+  cd/
+    cd82a0…   ← react/cjs/react.development.js
+```
+
+You can check which store path a project is drawing from:
+
+```bash
+aube store path
+```
+
+## Finding the store size
+
+```bash
+du -sh "$(aube store path)"
+```
+
+To see a breakdown by top-level shard directory (each is two hex characters):
+
+```bash
+du -sh "$(aube store path)"/*/ | sort -h | tail -20
+```
+
+## Related commands
+
+- `aube cat-file <hash>` — print the contents of a single file from the store by its BLAKE3 hash or `sha512-<base64>` integrity string.
+- `aube cat-index <name@version>` — print the cached package index JSON that maps a package version to its store file hashes.

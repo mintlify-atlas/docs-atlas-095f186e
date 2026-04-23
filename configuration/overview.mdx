@@ -1,0 +1,159 @@
+---
+title: "Configuration overview: how aube resolves settings"
+description: "Learn how aube merges CLI flags, environment variables, .npmrc, workspace YAML, and built-in defaults into a single resolved configuration for each install."
+keywords: ["aube", "configuration", "npmrc", "workspace yaml", "environment variables", "cli flags", "settings", "config"]
+---
+
+aube builds its configuration by merging five sources in a fixed priority order: CLI flags override everything, then environment variables, then project `.npmrc`, then workspace YAML, and finally built-in defaults. Every setting is resolved this way — you can override a single value at the command line without touching any file, or set a project-wide default in `.npmrc` that applies to every developer on the team.
+
+## Config hierarchy
+
+Settings resolve from highest to lowest priority:
+
+| Priority | Source | Example |
+| --- | --- | --- |
+| 1 (highest) | CLI flags | `--node-linker=hoisted` |
+| 2 | Environment variables | `NPM_CONFIG_NODE_LINKER=hoisted` |
+| 3 | Project `.npmrc` | `node-linker=hoisted` |
+| 4 | Workspace YAML (`aube-workspace.yaml`) | `nodeLinker: hoisted` |
+| 5 (lowest) | Built-in defaults | `isolated` |
+
+## Key defaults
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `nodeLinker` | `isolated` | Keeps each package's transitive deps scoped to the packages that declared them. |
+| `packageImportMethod` | `auto` | Uses reflinks, hardlinks, or copies depending on what the filesystem supports. |
+| `minimumReleaseAge` | `1440` | Skips package versions published in the last 24 hours to guard against supply-chain attacks. |
+| `blockExoticSubdeps` | `true` | Rejects transitive deps that come from git URLs or direct tarball URLs. |
+
+## Config sources
+
+<Tabs>
+  <Tab title=".npmrc">
+    aube reads `.npmrc` from the project root and from your home directory. Keys use hyphenated lowercase or camelCase — aube accepts both. See the [settings reference](/configuration/settings) for every key.
+
+    ```ini
+    registry=https://registry.npmjs.org/
+    auto-install-peers=true
+    strict-peer-dependencies=false
+    node-linker=isolated
+    package-import-method=auto
+    ```
+
+    Scoped registry overrides and per-registry auth tokens follow standard npm `.npmrc` syntax:
+
+    ```ini
+    @mycorp:registry=https://npm.mycorp.internal/
+    //npm.mycorp.internal/:_authToken=YOUR_TOKEN
+    ```
+  </Tab>
+  <Tab title="Workspace YAML">
+    `aube-workspace.yaml` (or `pnpm-workspace.yaml` for existing pnpm projects) holds project-wide settings that apply to every developer. Keys are camelCase.
+
+    ```yaml
+    nodeLinker: isolated
+    minimumReleaseAge: 1440
+    publicHoistPattern:
+      - "*eslint*"
+    ```
+
+    You can also define workspace package globs in the same file:
+
+    ```yaml
+    packages:
+      - "packages/*"
+      - "apps/*"
+    nodeLinker: isolated
+    minimumReleaseAge: 1440
+    ```
+  </Tab>
+  <Tab title="Environment variables">
+    pnpm-compatible `NPM_CONFIG_*` aliases work for every setting. Convert the setting name to `SCREAMING_SNAKE_CASE` and prefix with `NPM_CONFIG_`.
+
+    ```bash
+    NPM_CONFIG_REGISTRY=https://registry.example.test aube install
+    NPM_CONFIG_NODE_LINKER=hoisted aube install
+    NPM_CONFIG_NETWORK_CONCURRENCY=8 aube install
+    ```
+
+    Some settings also have dedicated env var names — for example, `AUBE_DEPRECATION_WARNINGS` and the standard proxy vars `HTTPS_PROXY` / `NO_PROXY`. The [settings reference](/configuration/settings) lists every env var alongside the setting it controls.
+  </Tab>
+  <Tab title="CLI flags">
+    CLI flags take precedence over all other sources. They use hyphenated names that match the setting's `.npmrc` key.
+
+    ```bash
+    aube install --node-linker=hoisted
+    aube install --network-concurrency=32
+    aube install --resolution-mode=time-based
+    aube install --package-import-method=copy
+    ```
+
+    Not every setting has a CLI flag — only settings that are common to override per-invocation. The [settings reference](/configuration/settings) notes which settings expose a CLI flag.
+  </Tab>
+</Tabs>
+
+## Inspecting config
+
+Use `aube config` to read and write settings from the command line without editing files directly.
+
+```bash
+aube config get registry
+aube config set auto-install-peers false
+aube config list --json
+```
+
+`aube config get` resolves the value through the full hierarchy, so what you see is what aube would use. `aube config set` writes to the project `.npmrc` by default.
+
+## `package.json` — `pnpm.*` and `aube.*` namespaces
+
+aube reads pnpm's `package.json` config keys so existing projects keep working. Every key under `pnpm.*` is also accepted under `aube.*` for projects that want aube-native config without using the pnpm namespace.
+
+<CodeGroup>
+
+```json pnpm namespace (existing projects)
+{
+  "pnpm": {
+    "overrides": { "lodash": "4.17.21" },
+    "onlyBuiltDependencies": ["sharp"]
+  }
+}
+```
+
+```json aube namespace
+{
+  "aube": {
+    "overrides": { "lodash": "4.17.21" },
+    "catalog": { "react": "^18.0.0" },
+    "supportedArchitectures": { "os": ["current", "linux"] },
+    "onlyBuiltDependencies": ["sharp"],
+    "patchedDependencies": { "foo@1.0.0": "patches/foo.patch" },
+    "peerDependencyRules": { "ignoreMissing": ["react-native"] }
+  }
+}
+```
+
+```json both namespaces present
+{
+  "pnpm": {
+    "overrides": { "lodash": "4.17.21" },
+    "onlyBuiltDependencies": ["sharp"]
+  },
+  "aube": {
+    "overrides": { "lodash": "4.17.22" },
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
+```
+
+</CodeGroup>
+
+When both namespaces are present, aube merges them:
+
+- **Map-valued keys** (`overrides`, `catalog`, `catalogs`, `patchedDependencies`, `allowBuilds`, `allowedDeprecatedVersions`, `packageExtensions`, `peerDependencyRules.allowedVersions`): `aube.*` wins on key conflicts; disjoint keys from either namespace merge in.
+- **List-valued keys** (`onlyBuiltDependencies`, `neverBuiltDependencies`, `ignoredOptionalDependencies`, `peerDependencyRules.ignoreMissing`, `peerDependencyRules.allowAny`, `updateConfig.ignoreDependencies`, `supportedArchitectures.{os,cpu,libc}`): entries from both namespaces are unioned.
+- Top-level npm-standard keys (`overrides`, `packageExtensions`, `allowedDeprecatedVersions`, `updateConfig`) still take the highest precedence, so the `aube.*` alias does not change existing npm/pnpm precedence rules.
+
+<Note>
+  If you are migrating from pnpm, you do not need to rename any `pnpm.*` keys. aube reads them as-is.
+</Note>

@@ -1,0 +1,103 @@
+---
+title: 'aube list — print the installed dependency tree'
+description: 'Print the installed dependency tree for your project or global packages. Filter by depth, dependency type, and output format including JSON and parseable.'
+keywords: ['aube list', 'aube ls', 'dependency tree', 'list packages', 'node_modules']
+---
+
+`aube list` prints the dependency tree for the current project, showing each installed package and its version. By default it shows only direct dependencies (depth 0), but you can expand the tree to any depth or walk the full transitive graph. Use `ls` as a shorter alias.
+
+## Usage
+
+```bash
+aube list [FLAGS] [PATTERN]
+```
+
+Pass an optional `PATTERN` to filter output to packages whose name starts with that string (e.g. `aube list '@babel'`).
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--depth <DEPTH>` | How deep to render the transitive tree. `0` (default) shows only direct deps. Pass `9999` or `--depth=Infinity` for the full graph. |
+| `--json` | Shortcut for `--format json`. Emit a JSON array of package entries. |
+| `--parseable` | Shortcut for `--format parseable`. Emit one tab-separated line per package. |
+| `--format <FORMAT>` | Output format: `default`, `json`, or `parseable`. Default: `default`. |
+| `--long` | Add the store path for each entry (useful for debugging symlink locations). |
+| `-P --prod` | Show only production dependencies (skip devDependencies). |
+| `-D --dev` | Show only devDependencies. |
+| `-g --global` | List globally-installed packages instead of the project's dependency tree. |
+
+## Examples
+
+### Default output
+
+```bash
+aube list
+```
+
+```
+my-app@1.0.0 /home/user/project
+
+dependencies:
+├── express 4.19.2
+├── lodash 4.17.21
+└── zod 3.23.8
+
+devDependencies:
+├── typescript 5.4.5
+└── vitest 1.6.0
+```
+
+### Full transitive tree
+
+```bash
+aube list --depth Infinity
+```
+
+```
+my-app@1.0.0 /home/user/project
+
+dependencies:
+├─┬ express 4.19.2
+│ ├── accepts 1.3.8
+│ ├── body-parser 1.20.2
+│ └── ...
+```
+
+### Parseable output (one store path per line)
+
+```bash
+aube list --parseable
+```
+
+```
+/home/user/project
+/home/user/project/node_modules/.aube/express@4.19.2/node_modules/express
+/home/user/project/node_modules/.aube/lodash@4.17.21/node_modules/lodash
+```
+
+### Filter to a single package
+
+```bash
+aube list express
+```
+
+### Production dependencies only
+
+```bash
+aube list --prod
+```
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="why" icon="circle-question" href="/commands/why">
+    Trace why a package is installed via reverse dependency chains.
+  </Card>
+  <Card title="outdated" icon="clock" href="/commands/outdated">
+    Find packages with newer versions available in the registry.
+  </Card>
+  <Card title="check" icon="circle-check" href="/commands/check">
+    Verify the symlink tree resolves all declared dependencies.
+  </Card>
+</CardGroup>

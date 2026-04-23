@@ -1,0 +1,81 @@
+---
+title: 'aube exec — run a binary from node_modules/.bin'
+description: 'Execute any binary installed in node_modules/.bin, with workspace-wide recursive support, shell mode for pipelines, and an auto-install freshness check.'
+keywords: ['aube exec', 'run binary', 'node_modules/.bin', 'workspace exec', 'shell mode']
+sidebarTitle: 'exec'
+---
+
+`aube exec` runs a binary that lives in `node_modules/.bin`, prepending that directory to `PATH` so the command resolves without an explicit path. Unlike `aube run`, it doesn't look up a `package.json` script — it invokes the binary directly. aube checks the install state before execution and installs automatically if `node_modules` is out of date; pass `--no-install` to skip that check.
+
+## Synopsis
+
+```bash
+aube exec [FLAGS] <binary> [-- args…]
+```
+
+## How `node_modules/.bin` resolution works
+
+aube prepends the project's `node_modules/.bin` to `PATH` for the duration of the command. This means any binary installed as a direct or transitive dependency is available by name:
+
+```bash
+aube exec tsc --noEmit
+aube exec eslint src/
+aube exec jest --coverage
+```
+
+In a workspace, aube also prepends the root `node_modules/.bin`, so root-level tool installs are always accessible from any package.
+
+## Flags
+
+<ParamField query="--no-install" type="boolean">
+  Skip the auto-install freshness check and execute the binary immediately.
+</ParamField>
+
+<ParamField query="-c / --shell-mode" type="boolean">
+  Run the command through `sh -c` instead of execing the binary directly. Use this for pipelines, redirects, glob expansion, or any shell built-in syntax.
+</ParamField>
+
+<ParamField query="--parallel" type="boolean">
+  Run the command concurrently across every matched workspace package. First non-zero exit fails the overall run; sibling processes are allowed to finish.
+</ParamField>
+
+<ParamField query="--workspace-concurrency" type="number">
+  Maximum number of workspace packages to process concurrently during recursive execution. Accepted for pnpm compatibility.
+</ParamField>
+
+## Examples
+
+```bash
+# Run the TypeScript compiler
+aube exec tsc --noEmit
+
+# Run ESLint over the src directory
+aube exec eslint src/
+
+# Run a command with shell pipelines using --shell-mode
+aube exec -c 'tsc --noEmit && eslint src/'
+
+# Skip auto-install and exec immediately
+aube exec --no-install jest
+
+# Run a binary across every workspace package in parallel
+aube exec --parallel --filter '*' tsc --noEmit
+```
+
+<Note>
+  `aube exec` is the right tool when you want to run a locally installed binary without wrapping it in a `package.json` script. For scripts already defined in `package.json`, use `aube run`.
+</Note>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube run" icon="play" href="/commands/run">
+    Run a script defined in package.json.
+  </Card>
+  <Card title="aube dlx" icon="bolt" href="/commands/dlx">
+    Fetch and run a package without installing it permanently.
+  </Card>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Install dependencies so their binaries are available.
+  </Card>
+</CardGroup>

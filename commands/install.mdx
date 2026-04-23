@@ -1,0 +1,143 @@
+---
+title: 'aube install — install Node.js dependencies'
+description: 'Install all dependencies from package.json using the lockfile for exact pinning and the global content-addressed store to avoid redundant downloads.'
+keywords: ['aube install', 'install dependencies', 'node_modules', 'lockfile', 'frozen install']
+sidebarTitle: 'install'
+---
+
+`aube install` reads your `package.json`, resolves every dependency against `aube-lock.yaml` (or an existing lockfile in another format), fetches missing tarballs into the global content-addressed store, and materialises `node_modules` via a symlink tree. On subsequent runs, aube computes a BLAKE3 hash over the lockfile, `package.json`, and install-shape settings; if nothing changed, it exits immediately without touching the filesystem.
+
+## Synopsis
+
+```bash
+aube install [FLAGS]
+```
+
+Alias: `aube i`
+
+## Flags
+
+<ParamField query="--prod" type="boolean">
+  Skip `devDependencies` and install only production dependencies. Equivalent to `-P` / `--production`.
+</ParamField>
+
+<ParamField query="--dev" type="boolean">
+  Install only `devDependencies`. Equivalent to `-D`.
+</ParamField>
+
+<ParamField query="--frozen-lockfile" type="boolean">
+  Fail if the lockfile is out of date instead of updating it. Implied by `aube ci`; use this flag when you want the same guarantee inside a plain `install` call.
+</ParamField>
+
+<ParamField query="--prefer-frozen-lockfile" type="boolean">
+  Use the lockfile as-is when it satisfies `package.json`; only regenerate when it doesn't.
+</ParamField>
+
+<ParamField query="--lockfile-only" type="boolean">
+  Resolve dependencies and write the lockfile, but skip linking `node_modules`. Useful for CI workflows that only need the lockfile updated.
+</ParamField>
+
+<ParamField query="--force" type="boolean">
+  Bypass the `node_modules/.aube-state` freshness check and re-resolve the lockfile even when nothing has drifted. Mirrors pnpm's `install --force`.
+</ParamField>
+
+<ParamField query="--fix-lockfile" type="boolean">
+  Re-resolve lockfile entries whose spec drifted from `package.json`, leaving every other entry pinned at its locked version. Only drifted entries and the transitives they pull in are re-resolved.
+</ParamField>
+
+<ParamField query="--no-optional" type="boolean">
+  Skip `optionalDependencies` and don't install optional native modules.
+</ParamField>
+
+<ParamField query="--offline" type="boolean">
+  Fail if any metadata or tarball isn't already in the local cache. Never hits the network.
+</ParamField>
+
+<ParamField query="--prefer-offline" type="boolean">
+  Prefer cached metadata over re-validation; only hit the network on a cache miss.
+</ParamField>
+
+<ParamField query="--node-linker" type="string">
+  Which layout to materialise `node_modules/` as. `isolated` (default) uses aube's `.aube/`-backed symlink tree; `hoisted` builds an npm-style flat tree. `pnp` is not supported. Overrides `node-linker` / `nodeLinker` from `.npmrc` / `aube-workspace.yaml`.
+</ParamField>
+
+<ParamField query="--package-import-method" type="string">
+  How to import package files from the global store into the virtual store. One of `auto` (default — detects the fastest strategy), `hardlink`, `copy`, `clone` (reflink with copy fallback), or `clone-or-copy`.
+</ParamField>
+
+<ParamField query="--network-concurrency" type="number">
+  Cap concurrent tarball downloads. Defaults to 128 (lockfile path) or 64 (streaming path) when not set.
+</ParamField>
+
+<ParamField query="--shamefully-hoist" type="boolean">
+  Hoist every non-local transitive dependency to the top-level `node_modules/`. Overrides `shamefully-hoist` / `shamefullyHoist` from `.npmrc` / `aube-workspace.yaml`.
+</ParamField>
+
+<ParamField query="--public-hoist-pattern" type="string[]">
+  Selectively hoist matching transitive dependencies to the root `node_modules`. Repeatable; comma-separated values are also accepted.
+</ParamField>
+
+<ParamField query="--resolution-mode" type="string">
+  How to resolve version ranges. `highest` uses pnpm's classic behaviour; `time-based` picks the lowest satisfying direct dependency and constrains transitives by a publish-date cutoff. Accepts pnpm's aliases `time` and `lowest-direct`.
+</ParamField>
+
+<ParamField query="--side-effects-cache" type="boolean">
+  Cache post-build side effects for dependency packages. On by default for packages in the `allowBuilds` list. Pair with `--no-side-effects-cache` to opt out.
+</ParamField>
+
+<ParamField query="--verify-store-integrity" type="boolean">
+  Verify tarball SHA-512 against the lockfile integrity before importing into the store. On by default; pair with `--no-verify-store-integrity` to skip.
+</ParamField>
+
+<ParamField query="--dangerously-allow-all-builds" type="boolean">
+  Allow every dependency's lifecycle scripts to run, bypassing the `allowBuilds` allowlist. Do not use in CI.
+</ParamField>
+
+## Examples
+
+```bash
+# Install all dependencies
+aube install
+
+# Install only production dependencies
+aube install --prod
+
+# Update the lockfile without linking node_modules
+aube install --lockfile-only
+
+# Force a full re-resolve and reinstall
+aube install --force
+
+# Install with no network access (cache must already contain everything)
+aube install --offline
+
+# Prefer the cache; only fetch on a miss
+aube install --prefer-offline
+
+# Use a hoisted (npm-style) node_modules layout
+aube install --node-linker hoisted
+
+# Cap downloads to 16 concurrent connections
+aube install --network-concurrency 16
+
+# Fix lockfile entries that drifted from package.json ranges
+aube install --fix-lockfile
+```
+
+<Note>
+  aube skips lifecycle scripts for dependency packages by default. Use `aube approve-builds` to opt specific packages into running their install scripts, or pass `--dangerously-allow-all-builds` to unblock all of them at once (not recommended in CI).
+</Note>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube ci" icon="circle-check" href="/commands/ci">
+    Clean install with a frozen lockfile for reproducible CI builds.
+  </Card>
+  <Card title="aube add" icon="plus" href="/commands/add">
+    Add a new dependency and install it in one step.
+  </Card>
+  <Card title="aube update" icon="arrow-up" href="/commands/update">
+    Upgrade installed packages to newer versions.
+  </Card>
+</CardGroup>

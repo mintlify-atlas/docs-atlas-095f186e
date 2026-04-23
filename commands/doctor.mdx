@@ -1,0 +1,58 @@
+---
+title: 'aube doctor — run broad install-health diagnostics'
+description: 'Run a comprehensive set of install-health checks covering aube version, Node.js version, store integrity, and configuration, with optional JSON output.'
+keywords: ['aube doctor', 'install health', 'diagnostics', 'debug', 'troubleshoot', 'configuration check']
+---
+
+`aube doctor` runs a broad set of checks against your environment and install state: the aube and Node.js versions in use, global store integrity, active configuration values, and any detected anomalies in `node_modules`. It prints a grouped summary of findings and exits 0 when everything looks healthy. Use it as a first step when diagnosing unexpected install behaviour or environment mismatches.
+
+## Usage
+
+```bash
+aube doctor [-J --json]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `-J --json` | Emit a machine-readable JSON report instead of the grouped text output. |
+
+## Examples
+
+### Default output
+
+```bash
+aube doctor
+```
+
+```
+version: 1.0.0-beta.4
+node: v22.11.0
+...
+No problems found
+```
+
+### Filter JSON output with jq
+
+```bash
+aube doctor --json | jq .warnings
+```
+
+<Tip>
+Share the output of `aube doctor --json` when asking for help in the [aube Discussions](https://github.com/endevco/aube/discussions). It captures the key environment details needed to diagnose most install problems.
+</Tip>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="check" icon="circle-check" href="/commands/check">
+    Verify the node_modules symlink tree resolves all declared dependencies.
+  </Card>
+  <Card title="audit" icon="shield" href="/commands/audit">
+    Check installed packages against the registry advisory database.
+  </Card>
+  <Card title="outdated" icon="clock" href="/commands/outdated">
+    Report packages with newer versions available in the registry.
+  </Card>
+</CardGroup>

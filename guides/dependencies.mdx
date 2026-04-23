@@ -1,0 +1,138 @@
+---
+title: 'Add, update, and remove Node.js dependencies in aube'
+description: 'Add, remove, update, deduplicate, and prune packages in any Node.js project using aube — including workspace-aware and multi-specifier flows.'
+keywords: ['aube add', 'aube remove', 'aube update', 'aube dedupe', 'aube prune', 'dependencies', 'package manager']
+---
+
+Managing dependencies in aube works the same way you'd expect from npm or pnpm: a single command writes the right section of `package.json`, updates the lockfile, fetches packages into the global store, and relinks `node_modules`. The difference is speed — aube parallelises every step and reuses content-addressed store entries across projects.
+
+## Adding dependencies
+
+Use `aube add` to install a package and record it in `package.json`.
+
+```bash
+aube add react
+```
+
+<CodeGroup>
+
+```bash Dev dependency
+aube add -D vitest
+```
+
+```bash Exact pin
+aube add -E lodash@4.17.21
+```
+
+```bash Optional dependency
+aube add -O optional-pkg
+```
+
+```bash Peer dependency
+aube add --save-peer react
+```
+
+</CodeGroup>
+
+### Specifier formats
+
+`aube add` accepts the full range of npm-compatible specifiers:
+
+```bash
+aube add react@latest
+aube add alias-name@npm:actual-name@^1
+aube add jsr:@std/collections@^1.0.0
+aube add workspace:*
+aube add file:../local-package
+aube add link:../linked-package
+aube add https://registry.example.test/pkg/-/pkg-1.0.0.tgz
+```
+
+<Note>
+JSR packages (`jsr:@scope/name`) resolve through JSR's npm-compat endpoint. aube registers the `@jsr` scope automatically — no `.npmrc` setup needed.
+</Note>
+
+### Adding in a workspace
+
+Use `-w` to target the workspace root or `--filter` to target a specific package:
+
+```bash
+# Add to the workspace root
+aube add -w react
+
+# Add to a specific workspace package
+aube add zod --filter @acme/api
+```
+
+## Removing dependencies
+
+```bash
+aube remove react
+```
+
+`aube remove` deletes the entry from `package.json`, updates the lockfile, and relinks `node_modules`.
+
+## Updating dependencies
+
+```bash
+aube update
+aube update lodash
+aube update --latest react
+```
+
+Without `--latest`, `update` resolves to the highest version that still satisfies the existing range in `package.json`. With `--latest`, it rewrites the range specifier to the newly resolved version.
+
+## Finding stale dependencies
+
+Before updating, use `aube outdated` to see which packages have newer versions available:
+
+```bash
+aube outdated
+```
+
+Example output:
+
+```
+Package     Current  Wanted   Latest
+lodash      4.17.20  4.17.21  4.17.21
+typescript  5.3.3    5.3.3    5.4.5
+```
+
+`Wanted` is the highest version allowed by the current `package.json` range. `Latest` is the most recent published version.
+
+## Deduplicating the lockfile
+
+Over time, the lockfile can accumulate multiple versions of the same package when ranges allow a single version to satisfy all dependents. `aube dedupe` re-resolves the graph to collapse those duplicates.
+
+```bash
+aube dedupe
+```
+
+Use `--check` in CI to assert the lockfile is already deduplicated without writing anything:
+
+```bash
+aube dedupe --check
+```
+
+## Pruning node_modules
+
+`aube prune` removes packages from `node_modules` that are no longer needed — stale virtual-store entries, dangling `.bin` links, and anything not in the current lockfile.
+
+<Steps>
+  <Step title="Remove all extraneous packages">
+    ```bash
+    aube prune
+    ```
+  </Step>
+  <Step title="Remove dev dependencies too">
+    ```bash
+    aube prune --prod
+    ```
+    This leaves only production dependencies in `node_modules`.
+  </Step>
+  <Step title="Remove optional dependencies as well">
+    ```bash
+    aube prune --no-optional
+    ```
+  </Step>
+</Steps>

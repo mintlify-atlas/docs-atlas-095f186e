@@ -1,0 +1,122 @@
+---
+title: 'Manage distribution tags with aube dist-tag'
+description: 'Manage dist-tags on published packages. Add, list, and remove tags like latest, beta, and next to control which version installers receive by default.'
+keywords: ['aube dist-tag', 'dist tag', 'npm dist-tag', 'latest', 'beta', 'next', 'registry tags', 'release channel']
+---
+
+Distribution tags (dist-tags) are named pointers to specific published versions of a package. When someone runs `aube add my-pkg`, the registry resolves the `latest` dist-tag to determine which version to install. Tags like `beta`, `next`, and `stable` let you publish pre-releases or named channels without affecting users who install the default `latest`.
+
+`aube dist-tag` has three subcommands: `add`, `ls`, and `rm`. The command also accepts the alias `dist-tags`.
+
+## `aube dist-tag add`
+
+Add or update a dist-tag on a specific version. The spec must include an exact version — ranges and tags are not resolved.
+
+```bash
+aube dist-tag add <name>@<version> [tag]
+```
+
+The `[tag]` argument defaults to `latest` when omitted.
+
+### Examples
+
+Point the `stable` tag at a specific version:
+
+```bash
+aube dist-tag add react@18.2.0 stable
+```
+
+Update `latest` to a new version:
+
+```bash
+aube dist-tag add my-pkg@2.0.0 latest
+```
+
+Publish a pre-release under a `beta` channel without moving `latest`:
+
+```bash
+aube publish --tag beta
+# or manually after publishing:
+aube dist-tag add my-pkg@2.0.0-beta.1 beta
+```
+
+## `aube dist-tag ls`
+
+List every dist-tag for a package. When called without an argument, aube reads the package name from the `name` field in `./package.json`.
+
+```bash
+aube dist-tag ls [package]
+```
+
+### Examples
+
+List tags for any package:
+
+```bash
+aube dist-tag ls react
+```
+
+List tags for the current project (reads `package.json`):
+
+```bash
+aube dist-tag ls
+```
+
+Example output:
+
+```text
+beta: 19.0.0-beta.0
+latest: 18.3.1
+next: 19.0.0-rc.1
+```
+
+## `aube dist-tag rm`
+
+Remove a dist-tag from a package. This does not unpublish the version — it only removes the tag pointer. The `remove` alias is also accepted.
+
+```bash
+aube dist-tag rm <package> <tag>
+```
+
+<Warning>
+Removing the `latest` tag means `aube add <package>` will have no default version to resolve. Ensure you add a new `latest` tag before removing the existing one in production workflows.
+</Warning>
+
+### Examples
+
+Remove the `beta` tag:
+
+```bash
+aube dist-tag rm my-pkg beta
+```
+
+Remove a tag you no longer need:
+
+```bash
+aube dist-tag rm react stable
+```
+
+## Common patterns
+
+### Pre-release channels
+
+Use dist-tags to maintain separate install channels without overwriting `latest`:
+
+```bash
+# Publish a beta without moving latest
+aube publish --tag beta
+
+# Graduate to stable
+aube dist-tag add my-pkg@2.0.0 latest
+aube dist-tag rm my-pkg beta
+```
+
+### Pinning a "stable" tag
+
+If your team tracks a known-good version separately from `latest`:
+
+```bash
+aube dist-tag add my-pkg@1.9.5 stable
+# install the stable version
+aube add my-pkg@stable
+```

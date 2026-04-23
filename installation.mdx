@@ -1,0 +1,147 @@
+---
+title: "Install aube on macOS, Linux, Windows, or from source"
+description: "Install aube via mise, Homebrew, npm, cargo, Ubuntu PPA, Fedora COPR, or from source. Includes shell completion setup and install verification."
+keywords: ["aube", "install", "mise", "homebrew", "npm", "cargo", "ubuntu", "fedora", "linux", "macos"]
+---
+
+aube ships pre-built binaries for macOS, Linux, and Windows. The recommended path is mise, which handles version pinning and upgrades for you. If you prefer a different method, every option below lands the same `aube` binary on your `PATH`.
+
+## Install methods
+
+<Steps>
+  <Step title="Choose an install method">
+    Pick the method that fits your environment. mise is recommended for local development; the system package managers (PPA, COPR) are best for server environments.
+
+    <CodeGroup>
+
+    ```bash mise (recommended)
+    mise use -g aube
+    ```
+
+    ```bash Homebrew
+    brew install endevco/tap/aube
+    ```
+
+    ```bash npm
+    npm install -g @endevco/aube
+    ```
+
+    ```bash cargo / crates.io
+    cargo install aube --locked
+    ```
+
+    </CodeGroup>
+
+    <Note>
+      Homebrew/core does not accept beta releases, so aube is published from the Endev tap for now. The tap formula builds from source and installs shell completions.
+    </Note>
+
+    <Warning>
+      When installing via npm, do not use `--ignore-scripts`. The `preinstall` script drops the platform-appropriate native binary into place. Without it, every `aube` invocation runs through a Node shim instead of the native binary, which removes the performance advantage. For offline or air-gapped environments, use any other install method.
+    </Warning>
+  </Step>
+
+  <Step title="Install on Linux">
+    On Ubuntu and Fedora, you can install aube through the system package manager and receive automatic upgrades.
+
+    <Tabs>
+      <Tab title="Ubuntu (PPA)">
+        Supported on Ubuntu 26.04 (resolute). Packages are published as signed `.deb` files to the Launchpad PPA [`ppa:jdxcode/aube`](https://launchpad.net/~jdxcode/+archive/ubuntu/aube).
+
+        ```bash
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository -y ppa:jdxcode/aube
+        sudo apt install aube
+        ```
+
+        To upgrade later:
+
+        ```bash
+        sudo apt update && sudo apt install --only-upgrade aube
+        ```
+      </Tab>
+      <Tab title="Fedora / RHEL (COPR)">
+        Supported on Fedora 42, Fedora 43, Fedora Rawhide, EPEL 9, and EPEL 10 (RHEL / Rocky / Alma 9 and 10), on both `x86_64` and `aarch64`. RPMs are published to the COPR project [`jdxcode/aube`](https://copr.fedorainfracloud.org/coprs/jdxcode/aube/).
+
+        <Info>
+          The `dnf copr` subcommand ships with `dnf-plugins-core`. Install that first on EPEL or anywhere the plugin is not already available.
+        </Info>
+
+        ```bash
+        sudo dnf copr enable jdxcode/aube
+        sudo dnf install aube
+        ```
+
+        To upgrade later:
+
+        ```bash
+        sudo dnf upgrade aube
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Build from source (optional)">
+    If you want to build from the current checkout, you need a Rust toolchain installed. This installs the `aube` binary into `~/.cargo/bin`.
+
+    ```bash
+    git clone https://github.com/endevco/aube
+    cd aube
+    cargo install --path crates/aube
+    ```
+
+    <Info>
+      When installing from crates.io with cargo, use `--locked` to honor the committed `Cargo.lock` and get the same dependency versions used in CI:
+
+      ```bash
+      cargo install aube --locked
+      ```
+    </Info>
+  </Step>
+
+  <Step title="Verify the install">
+    Confirm aube is on your `PATH`:
+
+    ```bash
+    aube --version
+    ```
+
+    You should see output like `aube 1.0.0-beta.12`.
+  </Step>
+</Steps>
+
+## Shell completions
+
+Shell completions are powered by [`usage`](https://usage.jdx.dev). Install it first, then generate the completion script for your shell.
+
+```bash
+mise use -g usage
+```
+
+Then write the completion script to the appropriate location for your shell:
+
+<CodeGroup>
+
+```bash bash
+aube completion bash > /etc/bash_completion.d/aube
+```
+
+```bash zsh
+aube completion zsh > "${fpath[1]}/_aube"
+```
+
+```bash fish
+aube completion fish > ~/.config/fish/completions/aube.fish
+```
+
+</CodeGroup>
+
+## Pin aube per project
+
+If you use mise, you can pin an aube version inside a specific project so the whole team uses the same version:
+
+```bash
+mise use aube
+```
+
+This writes a `.mise.toml` (or updates an existing one) in the project directory. Teammates with mise installed will automatically use the pinned version when they enter the project.

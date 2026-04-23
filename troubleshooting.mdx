@@ -1,0 +1,149 @@
+---
+title: "Troubleshooting common aube package manager issues"
+description: "Fixes for the most common aube problems: virtual store errors, missing packages, build scripts, lockfile mismatches, registry auth, and workspace filters."
+keywords: ["aube", "troubleshooting", "ENOENT", "node_modules", "lockfile", "registry", "workspace", "build scripts"]
+---
+
+Most aube issues fall into a small number of categories: virtual store symlink behavior, build script approval, lockfile state, and registry configuration. Work through the accordion that matches your symptoms — each entry includes the exact commands to diagnose and resolve the problem.
+
+<AccordionGroup>
+  <Accordion title="Global virtual store errors (ENOENT, symlink invalid, Cannot find module, ERR_INVALID_PACKAGE_TARGET)">
+    If an install or build is behaving oddly, disable the global virtual store for the project before digging further:
+
+    ```bash
+    aube config set enableGlobalVirtualStore false --location project
+    ```
+
+    Symptoms that usually point to this:
+
+    - `Symlink ... is invalid, it points out of the filesystem root`
+    - `ENOENT: no such file or directory` for a module that clearly exists under `node_modules/.aube/`
+    - `Cannot find module '<pkg>'` from Next.js, Turbopack, Vite, VitePress, Nuxt, or Parcel during dev or build
+    - Plugin config discovery (PostCSS, Tailwind, Vite) silently misses a config file at the project root
+    - `ERR_INVALID_PACKAGE_TARGET` or exports-resolution failures for a package that resolves fine under pnpm or npm
+
+    Disabling the global virtual store switches to a layout where packages are linked directly into `node_modules` rather than through the shared virtual store. See [Configuration overview](/configuration/overview) for related settings.
+  </Accordion>
+
+  <Accordion title="A package is missing from node_modules">
+    Re-run the install, then check whether the package is in the dependency graph at all:
+
+    ```bash
+    aube install
+    aube list --depth Infinity <package>
+    ```
+
+    In the isolated linker, only direct dependencies are symlinked at the top level. Transitive dependencies live under the packages that declared them. If your application imports a package directly, add it to your own `package.json` — do not rely on a transitive copy.
+  </Accordion>
+
+  <Accordion title="A dependency build script did not run">
+    Aube follows the pnpm v11 build approval model: lifecycle scripts from dependency packages are skipped by default. Inspect the pending list and approve the packages that need build steps:
+
+    ```bash
+    aube ignored-builds
+    aube approve-builds
+    aube rebuild
+    ```
+
+    Use `--dangerously-allow-all-builds` only for a local diagnostic run. Do not use it as a permanent CI default — it bypasses the security model that protects installs from unexpected build steps in transitive packages.
+  </Accordion>
+
+  <Accordion title="Unsupported lockfile format">
+    Aube reads and writes the lockfile formats listed on the [lockfiles page](/guides/lockfiles). Two formats require migration before switching to aube:
+
+    - **Older pnpm v5/v6 lockfiles** — upgrade the lockfile with pnpm before switching to aube.
+    - **Yarn PnP projects** — switch to `nodeLinker: node-modules` in your Yarn config first. Aube writes a regular `node_modules` tree, not `.pnp.cjs`.
+
+    If a project has multiple lockfiles present, keep one canonical lockfile before rolling aube into CI. Competing lockfiles cause package managers to fight over dependency state.
+  </Accordion>
+
+  <Accordion title="Lockfile is out of sync">
+    Choose the repair command that matches your situation:
+
+    For a strict CI install that treats the lockfile as the source of truth:
+
+    ```bash
+    aube ci
+    ```
+
+    For a local repair that updates the lockfile to match the current `package.json`:
+
+    ```bash
+    aube install --fix-lockfile
+    ```
+
+    For a full re-resolve that regenerates the lockfile from scratch:
+
+    ```bash
+    aube install --no-frozen-lockfile
+    ```
+  </Accordion>
+
+  <Accordion title="aube run installed unexpectedly">
+    Script commands check install freshness before running. If `package.json` or the lockfile changed since the last install, aube installs first and then runs the script:
+
+    ```bash
+    aube run build
+    aube test
+    ```
+
+    This is intentional — it means you never run scripts against a stale `node_modules`. To skip the freshness check for a single invocation:
+
+    ```bash
+    aube run --no-install build
+    aube test --no-install
+    ```
+  </Accordion>
+
+  <Accordion title="Registry is unavailable">
+    If the cache already contains the required metadata and tarballs, install entirely offline:
+
+    ```bash
+    aube install --offline
+    ```
+
+    To prefer cached metadata but allow network requests for anything missing from the cache:
+
+    ```bash
+    aube install --prefer-offline
+    ```
+  </Accordion>
+
+  <Accordion title="Private registry or scope is not authenticated">
+    Aube reads npm-compatible registry configuration from `.npmrc` and environment variables. Add the registry and auth token for your private scope:
+
+    ```ini
+    @myorg:registry=https://registry.example.test
+    //registry.example.test/:_authToken=${NPM_TOKEN}
+    ```
+
+    Check what aube sees for the current project:
+
+    ```bash
+    aube config get registry
+    aube config list --json
+    ```
+
+    For publishing and login flows, see [Configuration overview](/configuration/overview).
+  </Accordion>
+
+  <Accordion title="Workspace filter matches nothing">
+    List the workspace packages to check their names and paths:
+
+    ```bash
+    aube list -r --depth 0
+    ```
+
+    Then retry the filter using an exact name, glob, path selector, or graph selector:
+
+    ```bash
+    aube -F '@scope/*' run build
+    aube -F './packages/api' test
+    aube -F 'api...' run build
+    ```
+  </Accordion>
+
+  <Accordion title="Falling back to another package manager temporarily">
+    Keep the existing lockfile while evaluating aube. Since aube writes supported lockfiles in place, the original package manager can keep using the same file during rollout. If aube hits a bug in a project, fall back for that job, keep the failing command and lockfile version handy, and open a thread in [GitHub Discussions](https://github.com/endevco/aube/discussions) with the exact command and package manager versions.
+  </Accordion>
+</AccordionGroup>

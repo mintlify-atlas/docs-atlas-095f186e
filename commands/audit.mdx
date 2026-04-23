@@ -1,0 +1,89 @@
+---
+title: 'aube audit — scan packages for known vulnerabilities'
+description: 'Scan installed packages against the npm advisory database. Reports vulnerabilities by severity with options to auto-fix, filter by dep type, and output JSON.'
+keywords: ['aube audit', 'security audit', 'vulnerability scan', 'npm advisory', 'CVE', 'GHSA']
+---
+
+`aube audit` submits your installed packages to the npm registry advisory database and prints a report of any known vulnerabilities. Each advisory includes the severity level, the affected package, the vulnerable version range, and the advisory title. The command exits with a non-zero status when vulnerabilities are found, making it easy to fail CI builds on new issues.
+
+## Usage
+
+```bash
+aube audit [FLAGS]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--audit-level <LEVEL>` | Only report advisories at or above this severity. One of `low`, `moderate`, `high`, `critical`. Default: `low`. |
+| `--fix` | Write `package.json` overrides that force vulnerable packages to the best available patched version. |
+| `--json` | Emit the full report as JSON (pnpm-compatible shape) instead of a table. |
+| `--ignore <ID>` | Drop advisories matching this ID. Matches against the numeric npm advisory ID, `GHSA-…` identifiers, and CVE IDs. Repeatable; comma-separated values are also accepted. |
+| `-P --prod` | Only audit `dependencies` and `optionalDependencies`. |
+| `-D --dev` | Only audit `devDependencies`. |
+| `--no-optional` | Skip `optionalDependencies`. |
+| `--ignore-unfixable` | Drop advisories for which no non-vulnerable version exists in the registry. |
+| `--ignore-registry-errors` | Exit with code 0 if the registry returns an error (useful in CI when the registry has a temporary outage). |
+
+## Examples
+
+### Default output
+
+```bash
+aube audit
+```
+
+```
+Severity  Package    Vulnerable  Title
+moderate  minimatch  <3.0.5      Regular Expression Denial of Service
+                                 https://github.com/advisories/GHSA-f8q6-p94x
+
+1 vulnerability found
+```
+
+### Fail only on high severity and above
+
+```bash
+aube audit --audit-level high
+```
+
+### Audit production deps only, skip optional
+
+```bash
+aube audit --prod --no-optional
+```
+
+### Machine-readable output
+
+```bash
+aube audit --json | jq '.advisories | length'
+```
+
+### Clean project
+
+```bash
+aube audit
+```
+
+```
+No known vulnerabilities found
+```
+
+<Note>
+`--fix` writes `pnpm.overrides` entries to `package.json` to force vulnerable transitive packages to a safe version. Run `aube install` after `--fix` to apply the overrides to `node_modules`.
+</Note>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="outdated" icon="clock" href="/commands/outdated">
+    Report packages with newer versions available in the registry.
+  </Card>
+  <Card title="check" icon="circle-check" href="/commands/check">
+    Verify the symlink tree resolves all declared dependencies.
+  </Card>
+  <Card title="doctor" icon="stethoscope" href="/commands/doctor">
+    Run broad install-health diagnostics across your project.
+  </Card>
+</CardGroup>

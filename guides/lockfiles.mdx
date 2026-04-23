@@ -1,0 +1,86 @@
+---
+title: 'How aube reads, writes, and converts lockfile formats'
+description: 'Learn how aube reads and writes six lockfile formats in place, controls frozen installs, handles branch lockfiles, and converts to aube-lock.yaml.'
+keywords: ['aube-lock.yaml', 'lockfile', 'frozen lockfile', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock', 'aube import']
+---
+
+aube uses `aube-lock.yaml` as the default lockfile for new projects, but it reads and writes all major lockfile formats in place. If your project already has a `pnpm-lock.yaml`, `yarn.lock`, or `package-lock.json`, aube continues updating that file — you don't need to convert it to start using aube.
+
+## Supported lockfile formats
+
+| Lockfile | Reads | Writes in place |
+|----------|-------|-----------------|
+| `aube-lock.yaml` | yes | yes |
+| `pnpm-lock.yaml` v9 | yes | yes |
+| `package-lock.json` v2/v3 | yes | yes |
+| `npm-shrinkwrap.json` | yes | yes |
+| `yarn.lock` (v1 classic + v2+ berry) | yes | yes |
+| `bun.lock` | yes | yes |
+
+## Lockfile precedence
+
+When more than one supported lockfile exists in a project directory, aube writes to the one with the highest precedence:
+
+1. `aube-lock.yaml`
+2. `pnpm-lock.yaml`
+3. `bun.lock`
+4. `yarn.lock`
+5. `npm-shrinkwrap.json`
+6. `package-lock.json`
+
+If none of these files exist, aube creates `aube-lock.yaml`. Only `aube import` (or manually removing the existing lockfile) moves a project onto `aube-lock.yaml`.
+
+## Frozen installs
+
+Frozen mode fails the install if the lockfile no longer matches `package.json`. Use it in CI to guarantee reproducible installs from the committed lockfile.
+
+```bash
+aube install --frozen-lockfile
+aube ci
+```
+
+`aube ci` is the strict CI shortcut: it deletes `node_modules` and then runs a frozen install in one step.
+
+## Prefer frozen installs
+
+```bash
+aube install --prefer-frozen-lockfile
+```
+
+This is the local default. aube uses the lockfile as-is when it is fresh and re-resolves only when `package.json` changed. Use this when you want fast local installs without the hard failure of `--frozen-lockfile`.
+
+## Lockfile-only updates
+
+```bash
+aube install --lockfile-only
+```
+
+Resolves dependencies and writes the lockfile without touching `node_modules`. Useful in CI or automation pipelines that need to update dependency metadata without triggering a full install.
+
+## Branch lockfiles
+
+When `gitBranchLockfile` is enabled in your workspace configuration, aube writes branch-specific lockfile names such as `aube-lock.<branch>.yaml`. This prevents lockfile conflicts on long-running feature branches that diverge significantly from `main`.
+
+When you merge a branch, run:
+
+```bash
+aube install --merge-git-branch-lockfiles
+```
+
+This merges every `aube-lock.<branch>.yaml` file into `aube-lock.yaml` and deletes the branch files.
+
+## Converting to aube-lock.yaml
+
+To migrate an existing project from another lockfile format to `aube-lock.yaml`:
+
+```bash
+aube import
+```
+
+`aube import` reads the existing lockfile, converts its resolved graph to `aube-lock.yaml`, and writes the new file. It does not touch `node_modules` — run `aube install` afterwards to relink the install.
+
+## Limitations
+
+<Note>
+aube does not support older pnpm v5/v6 lockfile shapes. Upgrade those projects with pnpm to v9 before switching to aube. Yarn PnP projects must migrate to a `node_modules` linker first — aube writes `node_modules`, not `.pnp.cjs`.
+</Note>

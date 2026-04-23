@@ -1,24 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Aube",
+  "projectType": "cli-tool",
+  "projectName": "Aube",
+  "projectDescription": "A fast Node.js package manager written in Rust that drops into existing projects and reads/writes pnpm, npm, yarn, and bun lockfiles in place.",
   "theme": "luma",
-  "colors": {
-    "primary": "#7c7c74",
-    "light": "#0c0c0c",
-    "dark": "#ebebe3"
-  },
-  "favicon": "https://media.brand.dev/2b570470-11c9-45d7-b11b-556521f96599.svg",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/endevco/aube"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/endevco/aube"
-    }
-  },
+  "primaryColor": "#7c7c74",
+  "lightColor": "#0c0c0c",
+  "darkColor": "#ebebe3",
   "navigation": {
     "tabs": [
       {
@@ -81,8 +68,7 @@
               "commands/ci",
               "commands/run",
               "commands/exec",
-              "commands/dlx",
-              "commands/patch"
+              "commands/dlx"
             ]
           },
           {
@@ -116,5 +102,45 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Warm CI installs ~7x faster than pnpm and ~3x faster than Bun",
+    "Reads and writes existing pnpm, npm, yarn, and bun lockfiles in place",
+    "Global content-addressable store (BLAKE3) with reflink/hardlink sharing across projects",
+    "Auto-installs before script/exec/test commands when lockfile or package.json changed",
+    "Isolated node_modules layout preventing phantom dependency access",
+    "Secure defaults: minimum release age, exotic transitive dep blocking, lifecycle script approval",
+    "Full workspace support with catalog protocol, filters, and graph selectors",
+    "Patch workflow (aube patch / patch-commit / patch-remove)",
+    "JSR registry support alongside npm"
+  ],
+  "publicApiSurface": [
+    "aube install",
+    "aube add",
+    "aube remove",
+    "aube update",
+    "aube ci",
+    "aube run",
+    "aube exec",
+    "aube dlx",
+    "aube list",
+    "aube why",
+    "aube outdated",
+    "aube audit",
+    "aube check",
+    "aube doctor",
+    "aube store",
+    "aube cache",
+    "aube fetch",
+    "aube publish",
+    "aube pack",
+    "aube approve-builds",
+    "aube patch / patch-commit / patch-remove",
+    "aube config get/set/list/delete",
+    "aube import",
+    "aube dedupe",
+    "aube workspaces (--filter/-F, --recursive/-r)",
+    "aubr (aube run shim)",
+    "aubx (aube dlx shim)"
+  ]
 }

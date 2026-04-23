@@ -1,0 +1,215 @@
+---
+title: "Settings reference: all aube configuration options"
+description: "Complete reference for aube's configuration settings, grouped by area — registry, node modules layout, package imports, security, install behavior, and store."
+keywords: ["aube", "settings", "configuration", "npmrc", "registry", "nodeLinker", "packageImportMethod", "storeDir", "peer dependencies"]
+---
+
+Every aube setting can be set in `.npmrc`, `aube-workspace.yaml`, an environment variable, or a CLI flag. This page documents the key settings grouped by area. For each setting, the `.npmrc` key, environment variable, and workspace YAML key are noted where they differ from the camelCase setting name. For the full list, see the [generated settings index](https://github.com/endevco/aube/blob/main/crates/aube-settings/settings.toml).
+
+## Registry
+
+Control which registries aube fetches packages from and how authentication is provided.
+
+<ParamField path="registry" type="string" default="https://registry.npmjs.org/">
+  The default registry for all package fetches. Set in `.npmrc` as `registry=<url>`.
+
+  ```ini
+  registry=https://registry.npmjs.org/
+  ```
+</ParamField>
+
+<ParamField path="@scope:registry" type="string">
+  Override the registry for a specific npm scope. Set in `.npmrc` alongside auth tokens.
+
+  ```ini
+  @mycorp:registry=https://npm.mycorp.internal/
+  //npm.mycorp.internal/:_authToken=YOUR_TOKEN
+  ```
+
+  Environment variable: `NPM_CONFIG_REGISTRIES`
+</ParamField>
+
+## Node modules layout
+
+These settings control how aube structures `node_modules` on disk.
+
+<ParamField path="nodeLinker" type='"isolated" | "hoisted" | "pnp"' default='"isolated"'>
+  Strategy for linking packages into `node_modules`.
+
+  - `isolated` (default): strict symlink layout under `node_modules/.aube/`. Each package can only see what it declared.
+  - `hoisted`: npm-style flatter `node_modules` tree. Conflicting versions are nested under the requiring package.
+  - `pnp`: accepted as a known value but rejected with a clear error — Yarn Plug'n'Play is not supported.
+
+  CLI flag: `--node-linker`
+  Environment variable: `NPM_CONFIG_NODE_LINKER`
+  `.npmrc` key: `node-linker`
+  Workspace YAML key: `nodeLinker`
+
+  ```bash
+  aube install --node-linker=hoisted
+  ```
+</ParamField>
+
+<ParamField path="shamefullyHoist" type="boolean" default="false">
+  Hoist all dependencies to the root `node_modules`. Equivalent to setting `publicHoistPattern=["*"]`. Emulates npm's flat layout, which enables phantom dependency bugs by design. Use only as a last-resort compatibility knob.
+
+  CLI flag: `--shamefully-hoist`
+  Environment variable: `NPM_CONFIG_SHAMEFULLY_HOIST`
+  `.npmrc` key: `shamefully-hoist`
+  Workspace YAML key: `shamefullyHoist`
+</ParamField>
+
+<ParamField path="publicHoistPattern" type="string[]" default="[]">
+  Glob list of package names to hoist directly to the root `node_modules`. Packages matching these patterns get a top-level `node_modules/<name>` symlink so frameworks like Next.js, Storybook, and Jest can resolve transitive deps from the project root.
+
+  CLI flag: `--public-hoist-pattern`
+  Environment variable: `NPM_CONFIG_PUBLIC_HOIST_PATTERN`
+  `.npmrc` key: `public-hoist-pattern`
+  Workspace YAML key: `publicHoistPattern`
+
+  ```yaml
+  publicHoistPattern:
+    - "*eslint*"
+    - "*prettier*"
+  ```
+
+  <Warning>
+    Anything hoisted here becomes a phantom dependency at the root. Prefer adding the dep to `package.json` explicitly where possible.
+  </Warning>
+</ParamField>
+
+## Package imports
+
+Control how aube moves files from the global store into your project's `node_modules`.
+
+<ParamField path="packageImportMethod" type='"auto" | "hardlink" | "copy" | "clone" | "clone-or-copy"' default='"auto"'>
+  Method for importing packages from the content-addressable store into the virtual store.
+
+  - `auto` (default): probes the destination filesystem and picks the fastest available strategy — reflink (copy-on-write) → hardlink → copy.
+  - `hardlink`: hard-links from the store, with a copy fallback on cross-filesystem errors.
+  - `copy`: always writes a full copy. Useful when you need every project to have independent file copies.
+  - `clone`: uses reflinks. Falls back to copy when reflinks are unsupported.
+  - `clone-or-copy`: tries reflink first, falls back to plain copy instead of hardlinking.
+
+  CLI flag: `--package-import-method`
+  Environment variable: `NPM_CONFIG_PACKAGE_IMPORT_METHOD`
+  `.npmrc` key: `package-import-method`
+  Workspace YAML key: `packageImportMethod`
+
+  ```bash
+  aube install --package-import-method=copy
+  ```
+</ParamField>
+
+## Security
+
+Settings that protect against supply-chain attacks and restrict what packages can do during install.
+
+<ParamField path="minimumReleaseAge" type="number" default="1440">
+  Delay (in minutes) before a newly published package version is eligible for install. The resolver skips versions published within this window and falls back to the next-oldest version that satisfies the range.
+
+  Set to `0` to disable. Set `minimumReleaseAgeStrict=true` to fail the install rather than falling back to an older version.
+
+  Environment variable: `NPM_CONFIG_MINIMUM_RELEASE_AGE`
+  `.npmrc` key: `minimum-release-age`
+  Workspace YAML key: `minimumReleaseAge`
+
+  ```ini
+  minimum-release-age=2880
+  ```
+</ParamField>
+
+<ParamField path="blockExoticSubdeps" type="boolean" default="true">
+  When true, transitive dependencies referenced via `git+`, `file:`, or direct tarball URLs are rejected during resolution. This prevents supply-chain attacks that introduce unexpected download sources through deep transitive dependencies.
+
+  Environment variable: `NPM_CONFIG_BLOCK_EXOTIC_SUBDEPS`
+  `.npmrc` key: `block-exotic-subdeps`
+  Workspace YAML key: `blockExoticSubdeps`
+
+  <Tip>
+    If a transitive dependency legitimately uses a git URL, add it to your own `dependencies` explicitly so it becomes a direct dep under your control.
+  </Tip>
+</ParamField>
+
+## Install behavior
+
+Settings that affect dependency resolution, peer handling, and network performance during install.
+
+<ParamField path="autoInstallPeers" type="boolean" default="true">
+  Automatically install missing peer dependencies during resolution and hoist them into the importer. Set to `false` to match pnpm's opt-out behavior: peers are left alone and unmet peers are silent (combine with `strict-peer-dependencies=true` for diagnostics).
+
+  CLI flag: `--auto-install-peers`
+  Environment variable: `NPM_CONFIG_AUTO_INSTALL_PEERS`
+  `.npmrc` key: `auto-install-peers`
+  Workspace YAML key: `autoInstallPeers`
+
+  ```ini
+  auto-install-peers=true
+  strict-peer-dependencies=false
+  ```
+</ParamField>
+
+<ParamField path="strictPeerDependencies" type="boolean" default="false">
+  When true, any unmet peer dependency — missing, or resolved to a version outside the declared range — fails the install with a diagnostic listing every mismatch. When false (the default), aube is silent about peer mismatches.
+
+  Environment variable: `NPM_CONFIG_STRICT_PEER_DEPENDENCIES`
+  `.npmrc` key: `strict-peer-dependencies`
+  Workspace YAML key: `strictPeerDependencies`
+</ParamField>
+
+<ParamField path="resolutionMode" type='"highest" | "time-based" | "lowest-direct"' default='"highest"'>
+  Dependency version resolution strategy.
+
+  - `highest` (default): picks the highest version satisfying the declared range.
+  - `time-based`: prefers versions published before the root package, matching pnpm's time-based mode.
+  - `lowest-direct`: resolves direct dependencies to the lowest satisfying version while resolving transitive deps to the highest.
+
+  CLI flag: `--resolution-mode`
+  Environment variable: `NPM_CONFIG_RESOLUTION_MODE`
+
+  ```bash
+  aube install --resolution-mode=time-based
+  ```
+</ParamField>
+
+<ParamField path="networkConcurrency" type="number" default="128 (tarballs), 64 (packuments)">
+  Maximum concurrent HTTP(S) requests during install. Caps the tokio semaphores that gate tarball downloads and packument fetches.
+
+  CLI flag: `--network-concurrency`
+  Environment variable: `NPM_CONFIG_NETWORK_CONCURRENCY`
+  `.npmrc` key: `network-concurrency`
+  Workspace YAML key: `networkConcurrency`
+
+  ```bash
+  # Throttle for rate-limited registries
+  aube install --network-concurrency=8
+  ```
+</ParamField>
+
+## Store
+
+Settings that control the global content-addressable store.
+
+<ParamField path="storeDir" type="path" default="$XDG_DATA_HOME/aube/store/v1/files/">
+  Directory where aube stores downloaded package content. Defaults to `~/.local/share/aube/store/v1/files/` when `XDG_DATA_HOME` is not set.
+
+  aube does not read from or write to pnpm's `~/.pnpm-store/`. aube appends its own schema suffix (`v1/files`) to whatever path you configure, so `store-dir=/srv/aube-store` stores content under `/srv/aube-store/v1/files`.
+
+  `~` expands to the user home directory. Relative paths resolve against the project root.
+
+  Environment variable: `NPM_CONFIG_STORE_DIR`
+  `.npmrc` key: `store-dir`
+  Workspace YAML key: `storeDir`
+
+  ```ini
+  store-dir=/srv/aube-store
+  ```
+
+  ```bash
+  aube install && echo 'store-dir=/srv/aube-store' >> .npmrc
+  ```
+
+  <Note>
+    Only the on-disk CAS moves when you change `storeDir`. Packument and virtual-store caches stay at `$XDG_CACHE_HOME/aube`.
+  </Note>
+</ParamField>

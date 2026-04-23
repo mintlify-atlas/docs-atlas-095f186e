@@ -1,0 +1,86 @@
+---
+title: 'Migrating to aube from pnpm — a complete guide'
+description: 'Switch from pnpm to aube with a command map, file comparison, behavior differences, supported lockfile versions, and aube import instructions.'
+keywords: ['pnpm migration', 'pnpm-lock.yaml', 'aube-lock.yaml', 'aube import', 'pnpm command map', 'aube workspace']
+---
+
+aube is designed to be a drop-in replacement for pnpm. Most commands share the same name and flags, and aube reads and writes `pnpm-lock.yaml` in place, so you can try aube in an existing pnpm project without any changes to your lockfile or workspace configuration.
+
+## Command map
+
+| pnpm | aube | Notes |
+|------|------|-------|
+| `pnpm install` | `aube install` | Reads and updates an existing `pnpm-lock.yaml` in place. Only new projects with no supported lockfile default to `aube-lock.yaml`. |
+| `pnpm add react` | `aube add react` | Supports dependency sections, exact pins, peer deps, workspace root adds, and globals. |
+| `pnpm remove react` | `aube remove react` | Removes from the manifest and relinks. |
+| `pnpm update` | `aube update` | Updates all or named direct dependencies within declared ranges. |
+| `pnpm run build` | `aube run build` | Runs scripts with a staleness check; auto-installs if dependencies are out of date. |
+| `pnpm test` | `aube test` | Shortcut for the `test` script; auto-installs first (equivalent to `pnpm install-test`). |
+| `pnpm exec vitest` | `aube exec vitest` | Runs local binaries with `node_modules/.bin` on `PATH`; auto-installs on stale state. |
+| `pnpm dlx cowsay hi` | `aube dlx cowsay hi` | Installs into a throwaway environment and runs the binary. |
+| `pnpm list` | `aube list` | Supports depth, JSON, parseable, long, prod/dev, and global modes. |
+| `pnpm why debug` | `aube why debug` | Shows reverse dependency paths. |
+| `pnpm pack` | `aube pack` | Creates a publishable tarball with npm-style file selection. |
+| `pnpm publish` | `aube publish` | Publishes to the configured registry; workspace fanout available via filters. |
+| `pnpm approve-builds` | `aube approve-builds` | Records packages allowed to run lifecycle build scripts. |
+
+## Files and directories
+
+| Concept | pnpm | aube |
+|---------|------|------|
+| Default lockfile (new projects) | `pnpm-lock.yaml` | `aube-lock.yaml` |
+| Virtual store | `node_modules/.pnpm/` | `node_modules/.aube/` |
+| Global content-addressable store | `~/.pnpm-store/` | `$XDG_DATA_HOME/aube/store/v1/files/` (defaults to `~/.local/share/aube/store/v1/files/`) |
+| Install state | `node_modules/.modules.yaml` | `node_modules/.aube-state` |
+| Workspace manifest | `pnpm-workspace.yaml` | `aube-workspace.yaml` |
+
+aube reads pnpm v11 YAML files for compatibility. `aube-lock.yaml` and `aube-workspace.yaml` use pnpm-compatible shapes today but are the long-term contract and may diverge after the beta compatibility push.
+
+aube never touches pnpm's `node_modules/.pnpm/` or `~/.pnpm-store/`. The two virtual stores can coexist under `node_modules`. For the lockfile and workspace YAML, aube reads and writes whichever file already exists on disk — `pnpm-lock.yaml` keeps getting updates in place, and `pnpm-workspace.yaml` is read in place.
+
+## Behavior differences
+
+A handful of commands behave differently in ways worth knowing before you ship an aube-based workflow.
+
+| Command | Difference |
+|---------|------------|
+| `aube run <script>` | Checks install staleness and auto-installs before running. `pnpm run` does not. |
+| `aube test` | Auto-installs first, then runs the `test` script — equivalent to `pnpm install-test` in one command. |
+| `aube exec <bin>` | Auto-installs on stale state before running. `pnpm exec` does not install. |
+| `aube install` (new project) | Creates `aube-lock.yaml` when no existing lockfile is found. In an existing pnpm project, aube reads and writes `pnpm-lock.yaml` in place. |
+
+Everything else — `add`, `remove`, `update`, `dlx`, `list`, `why`, `pack`, `publish`, `approve-builds` — matches pnpm's behavior.
+
+## Supported pnpm lockfile versions
+
+aube reads and writes `pnpm-lock.yaml` at **lockfile version 9** — the format shipped by pnpm v9 and later. Older pnpm lockfiles (versions 5, 6, 7, and 8, used by pnpm 7.x and 8.x) are not supported and will cause aube to refuse the install.
+
+To upgrade an older pnpm lockfile, run a modern pnpm once to convert it:
+
+```bash
+npx pnpm@latest install
+```
+
+That rewrites `pnpm-lock.yaml` at v9. Commit the result, then switch to `aube install`.
+
+## What's out of scope
+
+aube does not manage Node.js or any other runtime. Runtime-management commands like `pnpm env`, `pnpm runtime`, `pnpm setup`, and `pnpm self-update` are intentionally not implemented. Use [mise](https://mise.jdx.dev) to install and switch Node versions:
+
+```bash
+mise use node@22
+```
+
+## Converting to aube-lock.yaml
+
+If you want to fully convert the project to aube's native lockfile format rather than keeping `pnpm-lock.yaml` as the shared source of truth, run:
+
+```bash
+aube import
+```
+
+`aube import` reads `pnpm-lock.yaml`, converts its resolved graph to `aube-lock.yaml`, and writes the new file. It does not touch `node_modules` — run `aube install` afterwards to relink the install. Once you're satisfied with the result, remove `pnpm-lock.yaml` so future installs write to `aube-lock.yaml`.
+
+<Note>
+For most teams, the simpler rollout is to leave `pnpm-lock.yaml` in place and let aube read and write it. `aube import` is only necessary when you want to stop using `pnpm-lock.yaml` entirely.
+</Note>

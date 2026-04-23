@@ -1,0 +1,89 @@
+---
+title: 'aube update — update installed Node.js packages'
+description: 'Update packages to the highest version satisfying their package.json range, or rewrite ranges to the latest published version when you pass --latest.'
+keywords: ['aube update', 'upgrade dependencies', 'update packages', 'latest version']
+sidebarTitle: 'update'
+---
+
+`aube update` re-resolves one or more packages and writes a new lockfile. Without `--latest`, it resolves to the highest version that still satisfies the existing range in `package.json` — the manifest file is not modified. With `--latest`, it rewrites the `package.json` specifiers to match the newly resolved versions, effectively pulling in major-version bumps.
+
+## Synopsis
+
+```bash
+aube update [FLAGS] [package]…
+```
+
+Omit package names to update every dependency at once.
+
+## Flags
+
+<ParamField query="-L / --latest" type="boolean">
+  Update past the manifest range: rewrite `package.json` specifiers to match the newly resolved versions (the registry's `latest` dist-tag, clamped by `minimumReleaseAge` / `resolution-mode` as configured).
+</ParamField>
+
+<ParamField query="-D / --dev" type="boolean">
+  Update only `devDependencies`.
+</ParamField>
+
+<ParamField query="-P / --prod" type="boolean">
+  Update only production dependencies.
+</ParamField>
+
+<ParamField query="--no-optional" type="boolean">
+  Skip `optionalDependencies` when updating.
+</ParamField>
+
+<ParamField query="--no-save" type="boolean">
+  Refresh the lockfile without rewriting `package.json` ranges. Pair with `--latest` to pull a newer resolved version into the lockfile while leaving the manifest's caret or tilde ranges untouched. Without `--latest` this flag is a no-op — a plain `update` already does not touch the manifest.
+</ParamField>
+
+<ParamField query="-w / --workspace" type="boolean">
+  Update dependencies in the current workspace package.
+</ParamField>
+
+<ParamField query="-i / --interactive" type="boolean">
+  Open an interactive update picker. Accepted for pnpm compatibility.
+</ParamField>
+
+## Examples
+
+```bash
+# Update all dependencies within their current ranges
+aube update
+
+# Update a specific package
+aube update react
+
+# Update multiple packages at once
+aube update react react-dom
+
+# Update to the latest published version, rewriting package.json ranges
+aube update --latest react
+
+# Update all dev dependencies to latest
+aube update --latest --dev
+
+# Pull a newer lockfile resolution without changing package.json ranges
+aube update --latest --no-save typescript
+
+# Update only production deps within their existing ranges
+aube update --prod
+```
+
+<Tip>
+  Use `aube outdated` first to see which packages have newer versions available before deciding which ones to update.
+</Tip>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube add" icon="plus" href="/commands/add">
+    Add a new dependency to the project.
+  </Card>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Install all dependencies from package.json.
+  </Card>
+  <Card title="aube remove" icon="minus" href="/commands/remove">
+    Remove a dependency from the project.
+  </Card>
+</CardGroup>

@@ -1,0 +1,71 @@
+---
+title: "Aube performance benchmarks and methodology"
+description: "End-to-end timing across four real-world scenarios using a ~1400-package fixture. Warm CI runs ~7x faster than pnpm and ~3x faster than Bun."
+keywords: ["aube", "benchmarks", "performance", "pnpm", "bun", "npm", "install speed", "ci"]
+---
+
+Aube is measured end-to-end against a medium-sized real-world fixture — roughly 1,400 packages — using [hyperfine](https://github.com/sharkdp/hyperfine) to time each scenario under identical conditions. The numbers below reflect that fixture across four scenarios, covering both the best-case warm path and the worst-case cold path.
+
+## Methodology
+
+<Note>
+  Every scenario assumes a committed lockfile is present. The only variable is how warm the tool's cache and store are before the command runs. **Warm** clears `node_modules` but keeps the global store and packument cache populated. **Cold** wipes the store and packument cache too. The fixture, scripts, and raw hyperfine output live in the [`benchmarks/`](https://github.com/endevco/aube/tree/main/benchmarks) directory of the source repository.
+</Note>
+
+Each run uses the same fixture `package.json` and the same locked dependency graph. The benchmark harness sets `RUNS=10` and `WARMUP=3` so transient noise is smoothed out before any timing is recorded.
+
+## Benchmark scenarios
+
+**CI install — warm cache, no `node_modules`**
+
+Frozen lockfile, `node_modules` wiped, store and packument cache warm. This is the common "CI install where the cache restored cleanly" path. Aube uses its global virtual store here — projects link to package trees that already exist in the store, so there is almost no disk I/O beyond creating symlinks.
+
+**CI install — cold cache, no `node_modules`**
+
+Frozen lockfile, but the store, packument cache, and `node_modules` are all wiped. This is worst-case CI: every tarball must be re-downloaded, extracted, and hashed into the content-addressable store.
+
+**`npm install && npm run test` — already installed**
+
+Models the developer loop after dependencies are already installed. Each timed run repeats the tool's normal "install if needed, then run tests" command. Aube can short-circuit the install work entirely when its install-state file is fresh; other tools still revalidate their lockfile or install state before dispatching the script. The fixture's `test` script is a no-op `node -e`, so this scenario mostly measures install short-circuiting and script dispatch overhead.
+
+**Add dependency**
+
+Lockfile and store both warm, then `aube add is-odd` to exercise the incremental resolve path.
+
+## Key results
+
+On the warm CI scenario, aube runs about **7x faster than pnpm** and **3x faster than Bun**. Across the full fixture set, the spread reaches up to ~22x faster than pnpm.
+
+The warm-cache result is the headline because it reflects the most common CI path: the store cache restores cleanly, `node_modules` is clean, and aube only needs to verify and link. Pnpm v11 supports a global virtual store too, but `enableGlobalVirtualStore` is not the default for project installs.
+
+## Why it's faster
+
+Aube uses the same on-disk model as pnpm — a global content-addressable store plus an isolated symlink layout — but the install pipeline runs in Rust rather than JavaScript:
+
+- **Rust and native threading.** The linker pass runs on a rayon thread pool, creating symlinks in parallel without async overhead or JavaScript's single-threaded event loop.
+- **Global content-addressable store.** Package files are stored once at `~/.local/share/aube/store/` using BLAKE3 content addressing. Projects share files instead of keeping full copies.
+- **Global virtual store.** On warm runs, aube links into `node_modules/.aube/` from trees that already exist. Most installs resolve to a symlink pass rather than any I/O.
+- **Isolated symlink layout.** Each package gets its own scoped `node_modules`, so the linker only touches what changed between runs. The frozen fast path short-circuits entirely when the lockfile and `package.json` match the recorded install state.
+
+## How to reproduce
+
+Run the full scenario matrix and write results to `benchmarks/results.json`:
+
+```bash
+mise run bench:bump
+```
+
+For cross-machine reproducibility, use hermetic mode. This starts a local Verdaccio registry and throttles the link to a fixed 500 Mbit/s baseline — a "fast home broadband" speed — so two runs on different networks produce comparable numbers:
+
+```bash
+flock /tmp/aube-bench.lock \
+  env BENCH_HERMETIC=1 BENCH_BANDWIDTH=500mbit mise run bench
+```
+
+<Note>
+  Do not pass `BENCH_HERMETIC` or `BENCH_BANDWIDTH` when running `bench:bump`. The `results.json` file must reflect real-internet baseline numbers so the benchmark chart stays comparable across releases.
+</Note>
+
+The task calls [`benchmarks/bench.sh`](https://github.com/endevco/aube/blob/main/benchmarks/bench.sh) through `mise x`, installs the benchmark toolchain declared on the task, and points `RESULTS_JSON` at `benchmarks/results.json` so the file is rewritten in place. Commit the updated JSON to refresh the published chart — the data loader reads it at build time, so you do not need to edit `benchmarks.mdx` or hand-write chart data.
+
+Raw hyperfine output and the full fixture are in [`benchmarks/`](https://github.com/endevco/aube/tree/main/benchmarks).

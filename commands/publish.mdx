@@ -1,0 +1,148 @@
+---
+title: 'Publish packages to the registry with aube publish'
+description: 'Pack and upload your package to an npm-compatible registry, with support for dist-tags, access control, provenance attestation, and workspace fanout.'
+keywords: ['aube publish', 'publish package', 'registry', 'dist-tag', 'provenance', 'sigstore', 'workspace publish', 'npm publish']
+---
+
+`aube publish` packs the current package into a tarball and uploads it to the configured registry. Before uploading, aube checks that the target `name@version` does not already exist on the registry and, by default, refuses to publish from a dirty git working tree.
+
+## Basic usage
+
+```bash
+aube publish
+```
+
+Publish under a specific dist-tag instead of `latest`:
+
+```bash
+aube publish --tag next
+```
+
+Publish a scoped package as public:
+
+```bash
+aube publish --access public
+```
+
+## Flags
+
+### `--dry-run`
+
+Print what would be published without uploading anything. Combine with `--json` for machine-readable output.
+
+```bash
+aube publish --dry-run
+aube publish --dry-run --json
+```
+
+### `--access <LEVEL>`
+
+Set the registry access level to `public` or `restricted`. Scoped packages (e.g. `@acme/pkg`) default to `restricted` on the registry side. Pass `--access=public` to make a new scoped package world-readable.
+
+```bash
+aube publish --access public
+aube publish --access restricted
+```
+
+### `--tag <TAG>`
+
+Publish under a custom dist-tag instead of the default `latest`.
+
+```bash
+aube publish --tag beta
+aube publish --tag next
+```
+
+### `--otp <CODE>`
+
+Provide a one-time password for registries that require two-factor authentication. aube sends the code as the `npm-otp` header.
+
+```bash
+aube publish --otp 123456
+```
+
+### `--no-git-checks`
+
+Skip the clean working-tree check. By default, aube refuses to publish when the checkout has uncommitted tracked changes or is on a detached or non-release branch.
+
+```bash
+aube publish --no-git-checks
+```
+
+### `--provenance`
+
+Generate a SLSA provenance attestation and attach it to the publish body. aube signs an in-toto statement via the Sigstore public-good instance (Fulcio + Rekor) and attaches the resulting bundle. Registries that support the npm provenance protocol display a "provenance" badge on the published version.
+
+<Note>
+Provenance requires an OIDC-capable CI environment. Supported environments include GitHub Actions with `id-token: write`, GitLab CI, Buildkite, and CircleCI.
+</Note>
+
+```bash
+aube publish --provenance
+```
+
+Example GitHub Actions job step:
+
+```yaml
+- name: Publish
+  run: aube publish --provenance
+  env:
+    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  permissions:
+    id-token: write
+```
+
+### `--json`
+
+Emit the publish result as a JSON array. Each entry has the shape `{name, version, filename, files: [{path}]}`, matching `pnpm publish --json`.
+
+```bash
+aube publish --json
+```
+
+### `--force`
+
+Republish `name@version` even when that version already exists on the target registry. Without this flag, aube issues a `GET` before the `PUT` and surfaces a clear error when the version is already present.
+
+<Warning>
+The npm public registry rejects re-publishes outright regardless of `--force`. This flag is intended for private registries such as Verdaccio that allow overwriting existing versions.
+</Warning>
+
+## Workspace publish
+
+Use the global `-r` flag or `--filter` (`-F`) to publish multiple workspace packages in one command.
+
+```bash
+# Publish every workspace package
+aube -r publish
+
+# Publish packages matching a filter
+aube -F '@acme/*' publish
+
+# Dry-run across the whole workspace
+aube -r publish --dry-run
+```
+
+## Registry auth
+
+aube reads auth tokens from `.npmrc`. Set a token for the target registry in the format:
+
+```ini
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+```
+
+For a private registry scoped to `@acme`:
+
+```ini
+@acme:registry=https://registry.example.test/
+//registry.example.test/:_authToken=${PRIVATE_REGISTRY_TOKEN}
+```
+
+You can also log in interactively:
+
+```bash
+aube login
+aube login --scope @acme --registry https://registry.example.test/
+```
+
+See [Configuration overview](/configuration/overview) for the full list of `.npmrc` options aube reads.

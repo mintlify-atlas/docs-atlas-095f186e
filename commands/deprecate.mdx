@@ -1,0 +1,97 @@
+---
+title: 'Deprecate and undeprecate packages with aube'
+description: 'Mark published package versions as deprecated on the registry, display a warning message to installers, and clear deprecations when they are no longer needed.'
+keywords: ['aube deprecate', 'aube undeprecate', 'deprecate package', 'npm deprecate', 'registry', 'otp']
+---
+
+`aube deprecate` marks one or more published versions of a package as deprecated on the registry. Installers see your deprecation message whenever they install an affected version. `aube undeprecate` clears an existing deprecation without requiring you to set an empty message manually.
+
+## Deprecating a package
+
+```bash
+aube deprecate <package> <message>
+```
+
+The `<package>` argument is a package spec: a bare name, `name@version`, or `name@<range>`. Omitting the version deprecates every published version.
+
+<Warning>
+Deprecation is not the same as unpublish. The package remains installable — users see the message as a warning, but the install succeeds. To remove a version entirely, use `aube unpublish`.
+</Warning>
+
+### Examples
+
+Deprecate a single version:
+
+```bash
+aube deprecate my-pkg@1.0.0 "Critical bug fixed in 1.0.1, please upgrade"
+```
+
+Deprecate a range of versions:
+
+```bash
+aube deprecate my-pkg@'<2.0.0' "Use my-pkg 2 or newer"
+```
+
+Deprecate every published version:
+
+```bash
+aube deprecate my-pkg "This package is no longer maintained"
+```
+
+## Undeprecating a package
+
+`aube undeprecate` clears the deprecation message on the specified versions. It is equivalent to `aube deprecate <package> ""` but more explicit.
+
+```bash
+aube undeprecate <package>
+```
+
+Clear the deprecation on a single version:
+
+```bash
+aube undeprecate my-pkg@1.0.0
+```
+
+Clear the deprecation on a range:
+
+```bash
+aube undeprecate my-pkg@'<2.0.0'
+```
+
+Clear the deprecation on every version:
+
+```bash
+aube undeprecate my-pkg
+```
+
+## Flags
+
+Both `aube deprecate` and `aube undeprecate` accept the following flags.
+
+### `--dry-run`
+
+Print which versions would be touched without sending any requests to the registry.
+
+```bash
+aube deprecate my-pkg@'<2.0.0' "Old version" --dry-run
+aube undeprecate my-pkg --dry-run
+```
+
+### `--otp <CODE>`
+
+Provide a one-time password for registries that require two-factor authentication. aube sends the code as the `npm-otp` header.
+
+```bash
+aube deprecate my-pkg@1.0.0 "Upgrade to 2.x" --otp 123456
+aube undeprecate my-pkg@1.0.0 --otp 123456
+```
+
+## Registry auth
+
+aube reads the auth token for the target registry from `.npmrc`:
+
+```ini
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+```
+
+Both commands also accept a `--registry` flag to override the registry for a single invocation.

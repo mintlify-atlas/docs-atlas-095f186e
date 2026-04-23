@@ -1,97 +1,111 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Aube: fast Node.js package manager"
+description: "Aube is a Rust-powered Node.js package manager that drops into existing projects, reads your current lockfile, and installs up to 7x faster than pnpm."
 ---
 
-## Setting up
+Aube is a fast Node.js package manager written in Rust. It works with your existing project without changing lockfile formats — if you have `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, or `bun.lock`, aube reads and writes it in place. Warm CI installs run about 7x faster than pnpm and 3x faster than Bun.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install aube via mise, Homebrew, npm, or cargo in under a minute.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first install and get up to speed with the daily workflow.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Command Reference" icon="terminal" href="/commands/install">
+    Every command, flag, and option documented with real examples.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Benchmarks" icon="gauge-high" href="/benchmarks">
+    See how aube compares to pnpm, npm, Bun, and yarn across CI scenarios.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why aube
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Fast installs" icon="bolt">
+    Warm CI is ~7x faster than pnpm and ~3x faster than Bun. A global content-addressable store means package files are shared across all your projects.
+  </Card>
+  <Card title="Drop-in compatible" icon="plug">
+    Works with your existing `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, and `bun.lock`. No migration required to try it.
+  </Card>
+  <Card title="Secure defaults" icon="shield-check">
+    New package releases wait out a minimum age before install. Lifecycle scripts from dependencies are blocked until you explicitly approve them.
+  </Card>
+  <Card title="Auto-install" icon="arrows-rotate">
+    `aube run`, `aube test`, and `aube exec` check install freshness automatically. If something changed, they install first — no separate step needed.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Get started
 
-## Need inspiration?
+<Steps>
+  <Step title="Install aube">
+    The recommended way is via [mise](https://mise.jdx.dev):
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    ```bash
+    mise use -g aube
+    ```
+
+    Or install from npm:
+
+    ```bash
+    npm install -g @endevco/aube
+    ```
+  </Step>
+  <Step title="Run in your project">
+    Drop aube into any existing Node.js project. If a lockfile is already present, aube reads and writes it in place:
+
+    ```bash
+    aube install
+    ```
+  </Step>
+  <Step title="Use daily commands">
+    ```bash
+    aube add react          # add a dependency
+    aube run build          # run a script (auto-installs if stale)
+    aube test               # install + run tests
+    aube exec vitest        # run a local binary
+    ```
+  </Step>
+</Steps>
+
+## Guides
+
+<CardGroup cols={2}>
+  <Card title="Managing dependencies" icon="box" href="/guides/dependencies">
+    Add, remove, update, dedupe, and prune dependencies.
+  </Card>
+  <Card title="Scripts and binaries" icon="play" href="/guides/scripts">
+    Run scripts, local binaries, and one-off tools with dlx.
+  </Card>
+  <Card title="Workspaces" icon="folder-tree" href="/guides/workspaces">
+    Monorepo support with filters, catalogs, and workspace protocol.
+  </Card>
+  <Card title="Lockfile compatibility" icon="lock" href="/guides/lockfiles">
+    How aube reads and writes six lockfile formats.
+  </Card>
+  <Card title="Lifecycle scripts" icon="gear" href="/guides/lifecycle-scripts">
+    The dependency build script approval model and how to manage it.
+  </Card>
+  <Card title="CI setup" icon="circle-check" href="/guides/ci">
+    Reproducible frozen installs and layer caching for CI pipelines.
+  </Card>
+</CardGroup>
+
+## Migration guides
+
+<CardGroup cols={2}>
+  <Card title="From pnpm" icon="arrow-right" href="/migration/pnpm">
+    Command map and behavior differences for pnpm users.
+  </Card>
+  <Card title="From npm" icon="arrow-right" href="/migration/npm">
+    Switching from npm with no lockfile changes required.
+  </Card>
+  <Card title="From yarn" icon="arrow-right" href="/migration/yarn">
+    Yarn classic and berry lockfile support.
+  </Card>
+  <Card title="From Bun" icon="arrow-right" href="/migration/bun">
+    Using aube in an existing Bun project.
+  </Card>
+</CardGroup>

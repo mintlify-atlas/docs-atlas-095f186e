@@ -1,0 +1,117 @@
+---
+title: "aube cache: inspect and manage packument metadata"
+description: "Inspect and manage aube's packument metadata cache. List cached packages, view metadata, delete entries, and understand TTL and ETag revalidation."
+keywords: ["aube", "cache", "packument", "metadata", "TTL", "ETag", "registry", "cache delete", "cache list"]
+---
+
+When aube resolves dependencies it fetches packument documents — the per-package JSON blobs from the registry that list every published version and its metadata. Rather than fetching these on every install, aube stores them locally and serves them from cache for five minutes. After that window, aube revalidates with an HTTP `If-None-Match` request using the cached ETag, so a 304 Not Modified response costs only one round-trip with no body transfer.
+
+The cache lives at:
+
+```text
+~/.cache/aube/       # Linux and macOS ($XDG_CACHE_HOME/aube/ when set)
+%LOCALAPPDATA%\aube\ # Windows
+```
+
+Unlike pnpm's per-host directory layout, aube keeps all packuments in a single flat directory. The `aube cache list-registries` command tells you which registries those packuments were fetched from.
+
+## Subcommands
+
+### `aube cache list`
+
+List every package whose packument is currently cached.
+
+```bash
+aube cache list
+```
+
+Pass one or more glob patterns to filter the output:
+
+```bash
+# Packages in the @babel scope
+aube cache list "@babel/*"
+
+# Every package whose name contains "react"
+aube cache list "*react*"
+
+# Multiple patterns at once
+aube cache list "eslint*" "@typescript-eslint/*"
+```
+
+Glob metacharacters `*`, `?`, and `[...]` are supported in any pattern.
+
+### `aube cache view`
+
+Show a summary of the cached metadata for a single package.
+
+```bash
+aube cache view <name>
+```
+
+The default output includes the cached versions, dist-tags, ETag, and the time the packument was last fetched. Pass `--json` to dump the raw cache file instead:
+
+```bash
+# Human-readable summary
+aube cache view lodash
+
+# Raw JSON
+aube cache view --json @babel/core
+```
+
+Scoped package names are accepted without any extra quoting on most shells:
+
+```bash
+aube cache view @types/node
+```
+
+### `aube cache delete`
+
+Delete the cached packument for one or more packages.
+
+```bash
+aube cache delete <pattern>…
+```
+
+Glob metacharacters work the same as in `aube cache list`:
+
+```bash
+# Delete the cache for a single package
+aube cache delete lodash
+
+# Delete every cached packument in the @babel scope
+aube cache delete "@babel/*"
+
+# Delete everything (force a full re-fetch on the next install)
+aube cache delete "*"
+```
+
+<Warning>
+  Deleting packuments does not remove files from the global store — it only removes the metadata that aube uses to resolve versions. Use `aube store prune` after deletion if you also want to reclaim store disk space.
+</Warning>
+
+### `aube cache list-registries`
+
+Print the registries that aube is currently configured to talk to, read from the project-level and user-level `.npmrc`.
+
+```bash
+aube cache list-registries
+```
+
+Because aube uses a single flat cache directory (not one per registry host), this command shows your active registry configuration rather than which hosts happen to have entries in the cache. Use it to confirm scope-to-registry mappings and custom registry URLs are picked up correctly.
+
+```bash
+# Example output
+https://registry.npmjs.org/
+https://npm.pkg.github.com/          # @acme scope
+```
+
+## Cache TTL and revalidation
+
+Cached packuments are considered fresh for **five minutes**. After that window, aube sends a conditional `GET` with `If-None-Match: <etag>`. A `304 Not Modified` response from the registry extends the TTL without transferring the full packument body.
+
+To force aube to bypass the cache and fetch a fresh packument, delete it first:
+
+```bash
+aube cache delete <name>
+aube install
+```

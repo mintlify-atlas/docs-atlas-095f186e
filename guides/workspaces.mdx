@@ -1,0 +1,148 @@
+---
+title: 'Setting up workspaces and filtering packages in aube'
+description: 'Configure multi-package workspaces in aube, use the workspace protocol, filter packages for targeted commands, manage catalogs, and deploy packages.'
+keywords: ['aube workspaces', 'workspace protocol', 'aube-workspace.yaml', 'pnpm-workspace.yaml', 'filter', 'catalog', 'aube deploy']
+---
+
+aube discovers workspace packages by reading `aube-workspace.yaml` at the project root. If your project already uses `pnpm-workspace.yaml`, aube reads it directly — you don't need to migrate the file to switch package managers. Both files use the same YAML format.
+
+## Configuring the workspace manifest
+
+Create an `aube-workspace.yaml` (or keep your existing `pnpm-workspace.yaml`) in the repository root:
+
+<Tabs>
+  <Tab title="aube-workspace.yaml">
+    ```yaml
+    packages:
+      - "packages/*"
+      - "apps/*"
+    ```
+  </Tab>
+  <Tab title="pnpm-workspace.yaml">
+    ```yaml
+    packages:
+      - "packages/*"
+      - "apps/*"
+    ```
+  </Tab>
+</Tabs>
+
+Glob patterns follow the same rules as pnpm. Any directory that contains a `package.json` matching a pattern becomes a workspace package.
+
+## Workspace protocol
+
+Use the `workspace:` protocol in `package.json` to reference sibling packages:
+
+```json
+{
+  "dependencies": {
+    "@acme/ui": "workspace:*",
+    "@acme/config": "workspace:^",
+    "@acme/utils": "workspace:~"
+  }
+}
+```
+
+- `workspace:*` — resolves to the exact local version during development; becomes a concrete version pin on publish or deploy.
+- `workspace:^` — resolves with a caret range (`^`) on publish.
+- `workspace:~` — resolves with a tilde range (`~`) on publish.
+
+During local development, all three forms link directly to the local package regardless of version. The protocol variant only matters at publish or deploy time when aube converts workspace references to registry specifiers.
+
+## Filtering packages
+
+All commands that support workspace fanout accept `-F` / `--filter` to scope execution. You can combine multiple `--filter` flags — matches are OR-ed.
+
+<CodeGroup>
+
+```bash Exact name
+aube -F api run build
+```
+
+```bash Glob
+aube -F '@acme/*' test
+```
+
+```bash Path
+aube -F './apps/web' install
+```
+
+```bash Dependents graph (api and everything that depends on it)
+aube -F 'api...' run build
+```
+
+```bash Dependencies graph (web and everything web depends on)
+aube -F '...web' run test
+```
+
+```bash Git-ref selector (changed since origin/main)
+aube -F '[origin/main]' run build
+```
+
+```bash Exclusion
+aube -F '!legacy' -r run lint
+```
+
+</CodeGroup>
+
+### Supported selector forms
+
+| Form | Example | Description |
+|------|---------|-------------|
+| Exact name | `api` | Matches the package named `api` |
+| Glob | `@acme/*` | Matches every package in the `@acme` scope |
+| Path | `./packages/api` | Matches the package at that directory |
+| Dependency graph | `api...` | `api` plus every package `api` depends on |
+| Dependent graph | `...web` | `web` plus every package that depends on `web` |
+| Immediate dependents | `api^...` | Direct dependents only (no transitive walk) |
+| Git-ref selector | `[origin/main]` | Packages with changes since the given ref |
+| Exclusion | `!legacy` | Excludes the named package from the matched set |
+
+## Recursive mode
+
+`-r` is shorthand for `--filter=*` and runs the command across every workspace package:
+
+```bash
+aube -r run build
+aube -r list --depth 0
+```
+
+If you also pass `--filter`, the explicit filter wins and `-r` is a no-op.
+
+## Catalogs
+
+Catalogs let you define canonical version ranges in `aube-workspace.yaml` and reference them from any `package.json` in the workspace. This keeps dependency versions consistent across packages without copy-pasting.
+
+```yaml
+catalog:
+  react: ^19.0.0
+
+catalogs:
+  test:
+    vitest: ^3.0.0
+```
+
+Reference catalog entries with the `catalog:` protocol:
+
+```json
+{
+  "dependencies": {
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:test"
+  }
+}
+```
+
+`catalog:` (no name) resolves from the root `catalog` map. `catalog:<name>` resolves from the matching entry under `catalogs`.
+
+## Deploying a workspace package
+
+`aube deploy` copies a workspace package's publishable files to a target directory, rewrites `workspace:` references to concrete versions, and runs a production install in the target. This is useful for containerised deployments where you want a self-contained directory.
+
+```bash
+aube -F api deploy dist/api
+```
+
+The target directory must be empty or not yet exist. After deploy, `dist/api` contains the package source and a fully-linked `node_modules` with production dependencies only.

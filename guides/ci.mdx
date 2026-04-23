@@ -1,0 +1,186 @@
+---
+title: 'Running aube in CI and Docker for fast, safe builds'
+description: 'Configure aube for reproducible CI installs with frozen lockfiles, offline mode, production-only installs, and Docker layer caching with GitHub Actions.'
+keywords: ['aube ci', 'frozen lockfile', 'CI install', 'Docker', 'GitHub Actions', 'offline', 'production install', 'cache']
+---
+
+aube is designed to be fast in CI. Its content-addressable store means repeated installs restore packages from disk rather than downloading them again, and the frozen-lockfile fast path short-circuits the resolver entirely when the lockfile and install state already match. This page covers how to set aube up for reproducible, cache-friendly CI builds.
+
+## The aube ci command
+
+`aube ci` is the recommended command for CI environments. It removes `node_modules`, verifies the lockfile is consistent with `package.json`, then installs from the frozen lockfile:
+
+```bash
+aube ci
+```
+
+If `package.json` and the lockfile disagree, `aube ci` fails immediately — it never silently updates the lockfile in CI.
+
+## Lockfile-only updates
+
+To update the lockfile without touching `node_modules` — useful in workflows that only prepare a lockfile commit:
+
+```bash
+aube install --lockfile-only
+```
+
+## Production-only installs
+
+Skip `devDependencies` for deployment builds:
+
+```bash
+aube install --prod
+```
+
+To also skip optional dependencies:
+
+```bash
+aube install --prod --no-optional
+```
+
+## Offline and prefer-offline modes
+
+<CodeGroup>
+
+```bash Prefer offline
+aube install --prefer-offline
+```
+
+```bash Fully offline
+aube install --offline
+```
+
+</CodeGroup>
+
+`--prefer-offline` serves package metadata from the local cache when available and only hits the network on a miss. `--offline` forbids all network access — the install fails if any required package is not already in the cache.
+
+## Cache directories
+
+aube uses two cache locations you should persist across CI runs:
+
+| Directory | Contents |
+|-----------|----------|
+| `~/.local/share/aube/store/` | Global content-addressable store (package files) |
+| `~/.cache/aube/` | Packument metadata cache |
+
+On Windows, the store falls back to `%LOCALAPPDATA%\aube\`.
+
+<Tip>
+Caching the store directory across CI runs turns every subsequent install into a reflink or hardlink operation — no network traffic for packages already seen.
+</Tip>
+
+## GitHub Actions example
+
+<Steps>
+  <Step title="Install aube">
+    Add an install step using your preferred method. The npm install approach works on any runner without additional setup.
+    ```yaml
+    - name: Install aube
+      run: npm install -g @endevco/aube
+    ```
+  </Step>
+  <Step title="Cache the aube store">
+    Restore the global store and packument cache from previous runs to avoid re-downloading packages.
+    ```yaml
+    - name: Cache aube store
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.local/share/aube/store
+          ~/.cache/aube
+        key: aube-${{ runner.os }}-${{ hashFiles('**/aube-lock.yaml', '**/pnpm-lock.yaml', '**/package-lock.json') }}
+        restore-keys: |
+          aube-${{ runner.os }}-
+    ```
+  </Step>
+  <Step title="Run a frozen install">
+    Use `aube ci` for a clean, reproducible install that fails if the lockfile is out of date.
+    ```yaml
+    - name: Install dependencies
+      run: aube ci
+    ```
+  </Step>
+  <Step title="Run your scripts">
+    ```yaml
+    - name: Build
+      run: aube run build
+
+    - name: Test
+      run: aube test
+    ```
+  </Step>
+</Steps>
+
+### Full workflow example
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install aube
+        run: npm install -g @endevco/aube
+
+      - name: Cache aube store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/aube/store
+            ~/.cache/aube
+          key: aube-${{ runner.os }}-${{ hashFiles('**/aube-lock.yaml', '**/pnpm-lock.yaml', '**/package-lock.json') }}
+          restore-keys: |
+            aube-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: aube ci
+
+      - name: Build
+        run: aube run build
+
+      - name: Test
+        run: aube test
+```
+
+## Docker layer caching
+
+Structure your Dockerfile to install dependencies in a separate layer before copying source files. This way, the install layer is only rebuilt when `package.json` or the lockfile changes — not when application code changes.
+
+```dockerfile
+FROM node:22-slim
+
+# Install aube
+RUN npm install -g @endevco/aube
+
+WORKDIR /app
+
+# Copy manifests first to get a cache-friendly install layer
+COPY package.json aube-lock.yaml ./
+
+# Resolve dependencies and write the lockfile without linking node_modules
+RUN aube install --lockfile-only
+
+# Copy application source
+COPY . .
+
+# Install from the frozen lockfile
+RUN aube install --frozen-lockfile --prod
+
+CMD ["node", "dist/index.js"]
+```
+
+<Tip>
+Using `aube install --lockfile-only` before copying source files ensures the resolver runs in its own layer. When only source files change, Docker reuses the cached lockfile layer and proceeds directly to the final install.
+</Tip>

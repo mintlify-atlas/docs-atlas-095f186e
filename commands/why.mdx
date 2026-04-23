@@ -1,0 +1,81 @@
+---
+title: 'aube why — trace reverse dependency chains'
+description: 'Show every reverse dependency path that explains why a package is installed, tracing from your direct dependencies down to the target package.'
+keywords: ['aube why', 'reverse dependency', 'why is this installed', 'dependency chain', 'transitive dependency']
+---
+
+`aube why` traces the reverse dependency graph to show every chain of packages that caused a given package to be installed. Each chain starts at one of your direct dependencies and ends at the package you asked about. This is useful when you want to understand why a transitive package is present — or whether it is safe to remove a direct dependency without breaking something deeper in the tree.
+
+## Usage
+
+```bash
+aube why [FLAGS] <PACKAGE>
+```
+
+`PACKAGE` is an exact package name match (e.g. `debug`, `@babel/core`).
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output an array of chain objects instead of the default tree. |
+| `--parseable` | Tab-separated output: one line per chain in the format `importer\tdep_type\tname@ver\t...` |
+| `--long` | Append each node's `.aube/<dep_path>` store path to the tree output. |
+| `-P --prod` | Only follow chains that start at a production (or optional) dependency. |
+| `-D --dev` | Only follow chains that start at a devDependency. |
+
+## Examples
+
+### Default tree output
+
+```bash
+aube why debug
+```
+
+```
+my-app@1.0.0 /home/user/project
+
+dependencies:
+express 4.19.2
+└── debug 2.6.9
+body-parser 1.20.2
+└── debug 2.6.9
+```
+
+### Only chains starting from devDependencies
+
+```bash
+aube why --dev typescript
+```
+
+### Include store paths for each node
+
+```bash
+aube why --long debug
+```
+
+### Tab-separated output (pipe-friendly)
+
+```bash
+aube why --parseable debug
+```
+
+### JSON output
+
+```bash
+aube why --json debug
+```
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="list" icon="list" href="/commands/list">
+    Print the full installed dependency tree.
+  </Card>
+  <Card title="outdated" icon="clock" href="/commands/outdated">
+    Find packages with newer versions available in the registry.
+  </Card>
+  <Card title="check" icon="circle-check" href="/commands/check">
+    Verify the symlink tree resolves all declared dependencies.
+  </Card>
+</CardGroup>

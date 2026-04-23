@@ -1,80 +1,175 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quickstart: run your first aube install in minutes"
+description: "Install aube, run your first install in an existing project, and learn the daily commands — add, run, test, exec, dlx — plus workspace basics and CI setup."
+keywords: ["aube", "quickstart", "getting started", "install", "add", "run", "test", "exec", "dlx", "workspace", "ci"]
 ---
 
-## Get started in three steps
+aube drops into existing Node.js projects without requiring you to change your lockfile format. If your project already has `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, or `bun.lock`, aube reads and writes it in place. This guide walks you from install to daily use in a few minutes.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Install aube">
+    The recommended way is via [mise](https://mise.jdx.dev):
 
-### Step 1: Set up your local environment
+    ```bash
+    mise use -g aube
+    ```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    Verify it's available:
 
-### Step 2: Deploy your changes
+    ```bash
+    aube --version
+    ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    For other install methods — Homebrew, npm, cargo, Ubuntu PPA, Fedora COPR, or from source — see the [installation guide](/installation).
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Run your first install">
+    Navigate to an existing Node.js project and run:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    aube install
+    ```
 
-### Step 3: Go live
+    If the project already has a supported lockfile, aube reads it and writes any updates back to the same file. You do not need to delete or migrate your existing lockfile to try aube. For a new project with no lockfile, aube creates `aube-lock.yaml`.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Tip>
+      `aube run`, `aube test`, and `aube exec` all check install freshness automatically. If `package.json` or the lockfile changed since the last install, they install first and then run. In day-to-day work you rarely need a separate `aube install` step.
+    </Tip>
+  </Step>
+
+  <Step title="Add and remove dependencies">
+    Add a runtime dependency:
+
+    ```bash
+    aube add react
+    ```
+
+    Add a dev dependency:
+
+    ```bash
+    aube add -D vitest
+    ```
+
+    Remove a dependency:
+
+    ```bash
+    aube remove react
+    ```
+
+    Update all dependencies within their current `package.json` ranges:
+
+    ```bash
+    aube update
+    ```
+  </Step>
+
+  <Step title="Run scripts and binaries">
+    Run a script from `package.json`:
+
+    ```bash
+    aube run build
+    ```
+
+    If the script name does not conflict with an aube command, you can call it directly:
+
+    ```bash
+    aube dev
+    aube build
+    aube lint
+    ```
+
+    Run the test script (installs first if anything changed):
+
+    ```bash
+    aube test
+    ```
+
+    Run a local binary from `node_modules/.bin`:
+
+    ```bash
+    aube exec vitest
+    ```
+
+    Run a package in a throwaway environment without installing it permanently:
+
+    ```bash
+    aube dlx cowsay hi
+    ```
+  </Step>
+
+  <Step title="Use the aubr and aubx shortcuts">
+    `aubr` and `aubx` are multicall shims that ship alongside `aube` in every release. They share a binary with `aube` and dispatch on `argv[0]`, so every flag that works on the full command also works on the shim.
+
+    ```bash
+    aubr build          # same as: aube run build
+    aubx cowsay hi      # same as: aube dlx cowsay hi
+    ```
+
+    No extra setup is needed when you install aube via mise or the tarball — all three binaries are included.
+  </Step>
+
+  <Step title="Set up CI">
+    Use `aube ci` in CI pipelines where the lockfile must be the source of truth. It removes `node_modules`, verifies the lockfile is fresh for the current `package.json`, then installs:
+
+    ```bash
+    aube ci
+    ```
+
+    For Docker layers or workflows where you only want to update the lockfile without touching `node_modules`:
+
+    ```bash
+    aube install --lockfile-only
+    ```
+
+    For production-only installs that skip `devDependencies`:
+
+    ```bash
+    aube install --prod
+    ```
+
+    <Tip>
+      `aube ci` is stricter than `aube install`. It fails if the lockfile is out of sync with `package.json`, which catches accidental lockfile drift in pull requests.
+    </Tip>
+  </Step>
+
+  <Step title="Try workspace commands">
+    aube supports workspace projects and the `workspace:` protocol. If your project already uses `pnpm-workspace.yaml`, aube can read and write it. New aube-first workspaces use `aube-workspace.yaml`.
+
+    Install dependencies across all workspace packages:
+
+    ```bash
+    aube install -r
+    ```
+
+    Run the test script in every package:
+
+    ```bash
+    aube run test -r
+    ```
+
+    Add a dependency to a specific workspace package:
+
+    ```bash
+    aube add zod --filter @acme/api
+    ```
+
+    For a full walkthrough of filters, catalogs, and workspace dependencies, see the [workspaces guide](/guides/workspaces).
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Managing dependencies" icon="box" href="/guides/dependencies">
+    Add, remove, update, dedupe, and prune dependencies.
+  </Card>
+  <Card title="Scripts and binaries" icon="play" href="/guides/scripts">
+    Run scripts, local binaries, and one-off tools with dlx.
+  </Card>
+  <Card title="Workspaces" icon="folder-tree" href="/guides/workspaces">
+    Monorepo support with filters, catalogs, and workspace protocol.
+  </Card>
+  <Card title="CI setup" icon="circle-check" href="/guides/ci">
+    Reproducible frozen installs and layer caching for CI pipelines.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

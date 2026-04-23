@@ -1,0 +1,110 @@
+---
+title: 'aube add — add a dependency to your project'
+description: 'Add packages to package.json, fetch them into the global store, and relink node_modules — with flags for dev, exact, optional, peer, and global installs.'
+keywords: ['aube add', 'install package', 'dev dependency', 'peer dependency', 'global install']
+sidebarTitle: 'add'
+---
+
+`aube add` installs one or more packages, writes the appropriate entry to `package.json`, updates `aube-lock.yaml`, and relinks `node_modules` in a single step. Without flags, packages are recorded under `dependencies`. Pass a version specifier after the package name (`react@18`, `typescript@^5`) to pin a range; omit it to resolve the registry `latest` tag.
+
+## Synopsis
+
+```bash
+aube add [FLAGS] <package>[@specifier]…
+```
+
+aube accepts the full range of npm-compatible specifier formats:
+
+```bash
+aube add react                          # latest
+aube add react@18                       # major pin
+aube add react@^18.2.0                 # caret range
+aube add alias-name@npm:actual-name@^1 # npm alias
+aube add jsr:@std/collections@^1.0.0  # JSR package
+aube add workspace:*                   # workspace protocol
+aube add file:../local-package         # local path
+aube add https://example.com/pkg.tgz  # tarball URL
+```
+
+## Flags
+
+<ParamField query="-D / --save-dev" type="boolean">
+  Record the package under `devDependencies` instead of `dependencies`.
+</ParamField>
+
+<ParamField query="-E / --save-exact" type="boolean">
+  Pin the exact resolved version with no `^` prefix — e.g. `"react": "18.3.1"` instead of `"react": "^18.3.1"`.
+</ParamField>
+
+<ParamField query="-O / --save-optional" type="boolean">
+  Record the package under `optionalDependencies`. Install failures for optional packages do not abort the overall install.
+</ParamField>
+
+<ParamField query="--save-peer" type="boolean">
+  Record the package under `peerDependencies`. By convention, pair with `-D` so the peer is also installed locally for development — which is what pnpm does.
+</ParamField>
+
+<ParamField query="--no-save" type="boolean">
+  Snapshot `package.json` and the lockfile, link the packages into `node_modules`, then restore both files. The dependency is usable for the current process but the project's committed state is untouched. Useful for one-off experiments. Conflicts with `-g` / `--global`.
+</ParamField>
+
+<ParamField query="-g / --global" type="boolean">
+  Install the package globally into the aube global directory and link its binaries into the global bin directory. Mirrors `pnpm add -g`.
+</ParamField>
+
+<ParamField query="-w / --workspace" type="boolean">
+  Add the dependency to the workspace root's `package.json` regardless of the current working directory. aube walks up from the cwd to find `aube-workspace.yaml`, `pnpm-workspace.yaml`, or a `package.json` with a `workspaces` field.
+</ParamField>
+
+<ParamField query="-W / --ignore-workspace-root-check" type="boolean">
+  Allow `add` to run directly in a workspace root. By default aube refuses, because dependencies added at the root are shared by every package and usually indicate a mistake. Mirrors `pnpm add -W`.
+</ParamField>
+
+## Examples
+
+```bash
+# Add a production dependency
+aube add zod
+
+# Add a dev dependency
+aube add -D vitest
+
+# Pin the exact version
+aube add -E typescript
+
+# Add an optional dependency
+aube add -O fsevents
+
+# Add a peer dependency (also install locally)
+aube add --save-peer -D react
+
+# Install a package globally
+aube add -g cowsay
+
+# Add to the workspace root from any package directory
+aube add -w eslint
+
+# Override the workspace root guard to add directly at the root
+aube add -W turbo
+
+# Experiment with a package without persisting it
+aube add --no-save tsx
+```
+
+<Note>
+  JSR packages resolve through JSR's npm-compat endpoint. aube registers the `@jsr` scope automatically — no `.npmrc` configuration is needed.
+</Note>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Install all dependencies from package.json.
+  </Card>
+  <Card title="aube remove" icon="minus" href="/commands/remove">
+    Remove a dependency from package.json.
+  </Card>
+  <Card title="aube update" icon="arrow-up" href="/commands/update">
+    Update installed packages to newer versions.
+  </Card>
+</CardGroup>

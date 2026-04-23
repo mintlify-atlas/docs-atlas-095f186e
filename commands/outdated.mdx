@@ -1,0 +1,102 @@
+---
+title: 'aube outdated — find dependencies behind the registry'
+description: 'Report which installed packages have newer versions available in the registry, showing current, wanted, and latest versions in a concise table.'
+keywords: ['aube outdated', 'stale dependencies', 'update packages', 'outdated packages', 'semver']
+---
+
+`aube outdated` queries the registry for every installed package and prints a table of the ones that lag behind. Each row shows the currently installed version, the highest version still allowed by the `package.json` range (`wanted`), and the absolute latest published version (`latest`). Use the output to decide which packages to update and with what urgency.
+
+## Usage
+
+```bash
+aube outdated [FLAGS] [PATTERN]
+```
+
+Pass an optional `PATTERN` (prefix match) to narrow the report to a subset of packages — for example `aube outdated '@babel'`.
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Emit a JSON object keyed by package name instead of the default table. |
+| `--long` | Also show packages whose `wanted` version matches the installed version, plus the `package.json` specifier and dependency type. |
+| `-P --prod` | Show only production dependencies (skip devDependencies). |
+| `-D --dev` | Show only devDependencies. |
+
+## Examples
+
+### Default table output
+
+```bash
+aube outdated
+```
+
+```
+Package     Current  Wanted   Latest
+lodash      4.17.20  4.17.21  4.17.21
+typescript  5.3.3    5.3.3    5.4.5
+zod         3.22.4   3.22.4   3.23.8
+```
+
+### Long output with specifier details
+
+```bash
+aube outdated --long
+```
+
+```
+Package     Current  Wanted   Latest
+lodash      4.17.20  4.17.21  4.17.21
+typescript  5.3.3    5.3.3    5.4.5
+
+  lodash (dependencies): ^4.17.20
+  typescript (devDependencies): ^5.3.0
+```
+
+### Filter by package name prefix
+
+```bash
+aube outdated '@babel/*'
+```
+
+### JSON output
+
+```bash
+aube outdated --json
+```
+
+```json
+{
+  "lodash": {
+    "current": "4.17.20",
+    "wanted": "4.17.21",
+    "latest": "4.17.21"
+  }
+}
+```
+
+### Nothing to report
+
+When all packages are up to date, the command prints a single line and exits 0:
+
+```bash
+aube outdated
+```
+
+```
+All dependencies up to date.
+```
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="list" icon="list" href="/commands/list">
+    Print the full installed dependency tree.
+  </Card>
+  <Card title="audit" icon="shield" href="/commands/audit">
+    Check installed packages against the registry advisory database.
+  </Card>
+  <Card title="doctor" icon="stethoscope" href="/commands/doctor">
+    Run broad install-health diagnostics across your project.
+  </Card>
+</CardGroup>

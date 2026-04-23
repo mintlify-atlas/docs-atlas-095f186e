@@ -1,0 +1,130 @@
+---
+title: 'Controlling dependency lifecycle build scripts in aube'
+description: 'Understand how aube skips dependency build scripts by default, inspect skipped packages, approve specific builds, and configure the build policy.'
+keywords: ['lifecycle scripts', 'aube approve-builds', 'aube ignored-builds', 'aube rebuild', 'onlyBuiltDependencies', 'build security', 'postinstall']
+---
+
+Packages can declare lifecycle scripts — `preinstall`, `install`, `postinstall`, `prepare` — that run automatically during installation. aube treats root package scripts and dependency scripts differently: your own scripts run normally, but scripts declared by packages in `node_modules` are skipped by default. This protects installs from unexpected build steps in transitive dependencies.
+
+## Root scripts
+
+Scripts defined in your project's own `package.json` run during install unless you explicitly skip them:
+
+```bash
+aube install --ignore-scripts
+```
+
+## Dependency lifecycle scripts
+
+<Warning>
+Dependency lifecycle scripts are skipped by default. A package with a `postinstall` that compiles native code (such as `esbuild`, `sharp`, or `node-gyp`-based packages) will not run its build script unless you explicitly allow it. Running every dependency's scripts without review opens your install to arbitrary code execution from any package in the dependency graph — including transitive packages you did not choose directly.
+</Warning>
+
+### Inspecting skipped builds
+
+After an install, use `aube ignored-builds` to see which packages had scripts that were not run:
+
+```bash
+aube ignored-builds
+```
+
+Example output:
+
+```
+The following builds were ignored during install:
+  esbuild@0.20.2
+  sharp@0.33.4
+```
+
+### Approving builds
+
+Run `aube approve-builds` to interactively select packages whose scripts you want to allow. aube records the approved packages in `pnpm-workspace.yaml` under `onlyBuiltDependencies`:
+
+```bash
+aube approve-builds
+```
+
+To approve everything without prompting (for automation), pass `--all`:
+
+```bash
+aube approve-builds --all
+```
+
+### Re-running builds after approval
+
+After approving packages, run `aube rebuild` to execute the allowlisted build scripts immediately without reinstalling:
+
+```bash
+aube rebuild
+```
+
+### Skipping all checks
+
+`--dangerously-allow-all-builds` bypasses the allowlist entirely and runs every dependency's lifecycle scripts:
+
+```bash
+aube install --dangerously-allow-all-builds
+```
+
+<Warning>
+Do not use `--dangerously-allow-all-builds` in CI. It removes all build-script isolation and is intended only for local debugging of packages that require build steps. Use `aube approve-builds` instead to record an explicit allowlist that can be committed and reviewed.
+</Warning>
+
+## Configuring the build policy
+
+You can declare the build policy in `pnpm-workspace.yaml` (where `aube approve-builds` writes) or in `package.json`.
+
+### In pnpm-workspace.yaml
+
+```yaml
+onlyBuiltDependencies:
+  - sharp
+neverBuiltDependencies:
+  - untrusted-package
+allowBuilds:
+  esbuild: true
+```
+
+### In package.json
+
+aube reads `pnpm.*` keys (pnpm v9 legacy format) and `aube.*` keys. When both are present for the same setting, `aube.*` wins. Disjoint entries from either namespace are merged.
+
+```json
+{
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp"],
+    "neverBuiltDependencies": ["untrusted-package"]
+  },
+  "aube": {
+    "allowBuilds": {
+      "esbuild": true
+    },
+    "onlyBuiltDependencies": ["sharp"],
+    "neverBuiltDependencies": ["untrusted-package"]
+  }
+}
+```
+
+### Entry key formats
+
+Allow and deny entries support several matching patterns:
+
+| Pattern | Example | Matches |
+|---------|---------|---------|
+| Bare name | `esbuild` | Every version of `esbuild` |
+| Exact version | `esbuild@0.19.0` | Only that specific version |
+| Version union | `esbuild@0.19.0 \|\| 0.20.0` | Either of those two versions |
+| Wildcard name | `@babel/*` | Every package in the `@babel` scope |
+| Global wildcard | `*` | Every package |
+
+<Note>
+Deny rules always win over allow rules. Semver ranges are not supported in build policy entries — use an exact version or version union when you need to pin a specific audited build.
+</Note>
+
+## Git dependencies
+
+Git dependencies that declare a `prepare` script receive a nested install in the cloned checkout before aube snapshots the package. The final linked package uses the packed result, not the raw git checkout.
+
+## Side-effects cache
+
+When a package in the allowlist runs its build script, aube can cache the resulting post-build package tree. On future installs with the same input hash, aube reuses the cached result instead of re-running the build. This is controlled by the `--side-effects-cache` flag (enabled by default for allowlisted packages).

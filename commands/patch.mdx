@@ -1,0 +1,140 @@
+---
+title: 'Patch installed packages with aube patch'
+description: 'Edit an installed package in place, generate a .patch file, and apply it on every install. Covers patch, patch-commit, and patch-remove.'
+---
+
+The `aube patch` workflow lets you modify an installed package's source, save the diff as a `.patch` file, and have aube re-apply that patch automatically on every subsequent install. This is the same model as `pnpm patch` and is useful for fixing bugs in dependencies before an upstream release is available.
+
+## How it works
+
+<Steps>
+  <Step title="Extract a package for editing">
+    `aube patch` copies the installed package files into a temporary directory where you can edit them freely. The package must already be installed in `node_modules`.
+
+    ```bash
+    aube patch lodash@4.17.21
+    ```
+
+    aube prints the path to the edit directory:
+
+    ```
+    Edit the package at /tmp/aube-patch-abc123/
+    When done, run: aube patch-commit /tmp/aube-patch-abc123/
+    ```
+
+    To use a specific directory instead of a temporary one:
+
+    ```bash
+    aube patch lodash@4.17.21 --edit-dir ./patches/lodash-edit
+    ```
+  </Step>
+  <Step title="Edit the files">
+    Make your changes directly inside the edit directory. You can modify any file in the package — source files, types, or anything else.
+  </Step>
+  <Step title="Commit the patch">
+    `aube patch-commit` diffs the edit directory against the original snapshot and writes a `.patch` file to the `patches/` directory at your project root. It also records the patch in `pnpm.patchedDependencies` inside `package.json`.
+
+    ```bash
+    aube patch-commit /tmp/aube-patch-abc123/
+    ```
+
+    To write the patch file to a different directory:
+
+    ```bash
+    aube patch-commit /tmp/aube-patch-abc123/ --patches-dir my-patches
+    ```
+
+    After this step, `package.json` will contain:
+
+    ```json
+    {
+      "pnpm": {
+        "patchedDependencies": {
+          "lodash@4.17.21": "patches/lodash@4.17.21.patch"
+        }
+      }
+    }
+    ```
+
+    Commit both the `.patch` file and the updated `package.json` to version control.
+  </Step>
+  <Step title="Verify the patch applies">
+    Run `aube install` to confirm aube re-applies the patch cleanly:
+
+    ```bash
+    aube install
+    ```
+
+    aube reads `pnpm.patchedDependencies` and applies matching patches at materialize time, after extracting the package from the store.
+  </Step>
+</Steps>
+
+## Commands
+
+### `aube patch`
+
+```
+aube patch [--edit-dir <DIR>] [--ignore-existing] <PACKAGE>
+```
+
+Extracts `<PACKAGE>` from the linked virtual store into a writable directory. The package must be installed — aube copies from `node_modules/.aube/`, not from the registry, so the layout matches what install will later patch.
+
+| Flag | Description |
+|------|-------------|
+| `--edit-dir <DIR>` | Directory to extract the writable copy into. Defaults to a fresh temp dir. |
+| `--ignore-existing` | Extract a pristine copy even if a patch entry already exists for this package. |
+
+### `aube patch-commit`
+
+```
+aube patch-commit [--patches-dir <DIR>] <DIR>
+```
+
+Diffs the edit directory against the original snapshot (read from the sibling `source/` directory via the `.aube_patch_state.json` sidecar) and writes a `.patch` file. Also updates `pnpm.patchedDependencies` in `package.json`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--patches-dir <DIR>` | `patches` | Directory to write the `.patch` file into, relative to project root. |
+
+### `aube patch-remove`
+
+```
+aube patch-remove [<PACKAGES>...]
+```
+
+Removes one or more patch entries from `pnpm.patchedDependencies`. Package keys must be formatted as `<name>@<version>`, matching the key in `pnpm.patchedDependencies`.
+
+```bash
+# Remove a specific patch
+aube patch-remove lodash@4.17.21
+
+# Remove all patches
+aube patch-remove
+```
+
+<Warning>
+`patch-remove` only removes the `pnpm.patchedDependencies` entry. It does not delete the `.patch` file from disk — remove the file manually if you no longer need it.
+</Warning>
+
+## Using the `aube.*` namespace
+
+If your project uses the `aube.*` namespace in `package.json` instead of `pnpm.*`, patch entries go under `aube.patchedDependencies`:
+
+```json
+{
+  "aube": {
+    "patchedDependencies": {
+      "lodash@4.17.21": "patches/lodash@4.17.21.patch"
+    }
+  }
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="aube install" icon="download" href="/commands/install">
+    Patches are applied automatically on every install.
+  </Card>
+  <Card title="Lifecycle scripts" icon="gear" href="/guides/lifecycle-scripts">
+    Control which dependency build scripts run after patching.
+  </Card>
+</CardGroup>

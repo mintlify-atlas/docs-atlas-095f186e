@@ -1,0 +1,76 @@
+---
+title: 'aube check — verify the node_modules symlink tree'
+description: 'Verify that every installed package can resolve its declared dependencies through the node_modules symlink tree, and report any broken links by package name.'
+keywords: ['aube check', 'symlink tree', 'node_modules', 'dependency resolution', 'broken links']
+---
+
+`aube check` walks every package in `node_modules` and confirms that each one can resolve its own declared dependencies through the virtual-store symlink tree. This catches corruption or drift that can occur when `node_modules` is modified manually, a partial install interrupted, or the lockfile was edited without re-running `aube install`. It does not hit the network — it only reads what is already on disk.
+
+## Usage
+
+```bash
+aube check [--json]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Emit a machine-readable JSON report instead of the human-readable list. |
+
+## Examples
+
+### Healthy install
+
+```bash
+aube check
+```
+
+```
+node_modules symlink tree is consistent (checked 248 packages).
+```
+
+The command exits 0 when no issues are found.
+
+### Broken links found
+
+```bash
+aube check
+```
+
+```
+2 broken dependency links found:
+
+  vscode-languageserver@9.0.1
+    ✕ cannot resolve: vscode-languageserver-protocol@3.17.5
+
+  vscode-languageserver-protocol@3.17.5
+    ✕ cannot resolve: vscode-languageserver-types@3.17.5
+    ✕ cannot resolve: vscode-jsonrpc@8.2.1
+```
+
+The command exits 1 when broken links are found. Run `aube install` to restore a consistent state.
+
+### Machine-readable output
+
+```bash
+aube check --json
+```
+
+<Tip>
+Run `aube check` in CI after `aube ci` to catch any post-install mutation before your build steps execute.
+</Tip>
+
+## Related commands
+
+<CardGroup cols={3}>
+  <Card title="doctor" icon="stethoscope" href="/commands/doctor">
+    Run broad install-health diagnostics across your project.
+  </Card>
+  <Card title="list" icon="list" href="/commands/list">
+    Print the full installed dependency tree.
+  </Card>
+  <Card title="audit" icon="shield" href="/commands/audit">
+    Check installed packages against the registry advisory database.
+  </Card>
+</CardGroup>

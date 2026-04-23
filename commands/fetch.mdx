@@ -1,0 +1,80 @@
+---
+title: "aube fetch: download lockfile dependencies into the store"
+description: "Download all lockfile dependencies into the global store without creating node_modules. Use it to warm CI caches or prepare for offline installs."
+keywords: ["aube", "fetch", "store", "CI cache", "offline", "pre-warm", "prod", "dev", "lockfile"]
+---
+
+`aube fetch` reads the current lockfile and downloads every dependency listed in it into the global content-addressable store. It does not create or modify `node_modules` — it only ensures that all the required files are present in the store so that a subsequent `aube install` can link them without hitting the network.
+
+```bash
+aube fetch
+```
+
+## Flags
+
+### `--prod` / `-P`
+
+Fetch only production and optional dependencies. DevDependencies are skipped.
+
+```bash
+aube fetch --prod
+```
+
+Use this when building a production image and you know `devDependencies` will never be installed in that environment.
+
+### `--dev` / `-D`
+
+Fetch only devDependencies. Production and optional dependencies are skipped.
+
+```bash
+aube fetch --dev
+```
+
+## Use cases
+
+### Pre-warming a CI cache
+
+In CI pipelines the store is often the only thing worth caching between runs. Running `aube fetch` in a dedicated cache-restore step populates the store before the rest of the pipeline starts, so the actual install step only needs to link files rather than download them.
+
+A typical GitHub Actions pattern:
+
+```bash
+# Restore store cache (keyed on the lockfile hash)
+# Then pre-warm any entries that the cache missed
+aube fetch
+
+# Later in the pipeline, install runs instantly from the store
+aube install
+```
+
+### Preparing for an offline install
+
+Before going offline — such as on an air-gapped build machine or a long flight — run `aube fetch` while you still have network access. All tarballs are imported into the store, and `aube install` will succeed without a network connection as long as the lockfile has not changed.
+
+```bash
+# Download everything while online
+aube fetch
+
+# Later, offline — links from the store, no network required
+aube install
+```
+
+### Fetching a subset of dependencies
+
+If your deployment only ever installs production dependencies, you can save time and bandwidth by fetching only what you need:
+
+```bash
+# Only production deps
+aube fetch --prod
+
+# Only dev deps (e.g. for a lint-only job)
+aube fetch --dev
+```
+
+<Note>
+  `aube fetch` requires a lockfile. If the project does not have one yet, run `aube install` first to generate it.
+</Note>
+
+## Relationship to `aube install`
+
+`aube fetch` is a strict subset of what `aube install` does. The install pipeline runs: resolve → fetch → link → scripts. `aube fetch` runs only the fetch step and stops. Running `aube fetch` before `aube install` is an optimization — it does not change the outcome of the install.
